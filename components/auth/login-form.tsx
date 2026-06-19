@@ -117,6 +117,12 @@ export function LoginForm() {
               <p>请使用您的系统账号登录</p>
             </div>
           </form>
+          
+          <div className="mt-4 pt-4 border-t border-muted/20 text-center">
+            <p className="text-xs text-muted-foreground">
+              © 2026 机场设备管理系统 · 作者: Gray Yuan
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
