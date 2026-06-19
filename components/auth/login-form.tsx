@@ -120,7 +120,7 @@ export function LoginForm() {
           
           <div className="mt-4 pt-4 border-t border-muted/20 text-center">
             <p className="text-xs text-muted-foreground">
-              © 2026 机场设备管理系统 · 作者: Gray Yuan
+              © 2026 机场设备管理系统 · 作者: Gary Yuan
             </p>
           </div>
         </CardContent>
