@@ -34,7 +34,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { exportPaperRecordsCSV } from '@/lib/export'
-import { Plus, Download, Search, FileText, Loader2 } from 'lucide-react'
+import { Download, Search, Loader2, Plus, FileText } from 'lucide-react'
+import { toast } from 'sonner'
 
 export default function PaperRecordsPage() {
   const router = useRouter()
@@ -74,20 +75,25 @@ export default function PaperRecordsPage() {
     )
   }).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!currentUser) return
-    addPaperRecord({
-      ...formData,
-      operatorId: currentUser.id,
-      operatorName: currentUser.name,
-    })
-    setDialogOpen(false)
-    setFormData({
-      deviceId: cussDevices[0]?.id || '',
-      paperType: '热敏纸',
-      quantity: 1,
-      notes: '',
-    })
+    try {
+      await addPaperRecord({
+        ...formData,
+        operatorId: currentUser.id,
+        operatorName: currentUser.name,
+      })
+      toast.success('换纸记录已添加')
+      setDialogOpen(false)
+      setFormData({
+        deviceId: cussDevices[0]?.id || '',
+        paperType: '热敏纸',
+        quantity: 1,
+        notes: '',
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
+    }
   }
 
   const handleExport = () => {

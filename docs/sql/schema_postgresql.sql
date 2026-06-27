@@ -17,9 +17,10 @@
 -- 6. 设备表
 -- 7. 设备更换记录表
 -- 8. 换纸记录表
--- 9. 系统审计日志表
--- 10. 触发器（自动更新时间戳）
--- 11. 视图（统计汇总）
+-- 9. 耗材记录表
+-- 10. 系统审计日志表
+-- 11. 触发器（自动更新时间戳）
+-- 12. 视图（统计汇总）
 
 -- ============================================
 -- 1. 扩展和类型定义
@@ -220,7 +221,32 @@ CREATE INDEX idx_paper_change_records_operator_id ON paper_change_records(operat
 CREATE INDEX idx_paper_change_records_created_at ON paper_change_records(created_at);
 
 -- ============================================
--- 9. 系统审计日志表
+-- 9. 耗材记录表
+-- ============================================
+-- 记录设备耗材更换情况（通用耗材）
+
+CREATE TABLE consumable_records (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    device_id UUID NOT NULL REFERENCES devices(id) ON DELETE CASCADE COMMENT '设备ID',
+    consumable_type VARCHAR(50) NOT NULL COMMENT '耗材类型',
+    quantity INT NOT NULL DEFAULT 1 COMMENT '数量',
+    notes TEXT COMMENT '备注',
+    operator_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT COMMENT '操作员ID',
+    operator_name VARCHAR(100) NOT NULL COMMENT '操作员名称',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    
+    CONSTRAINT consumable_type_not_empty CHECK (LENGTH(consumable_type) > 0),
+    CONSTRAINT consumable_quantity_positive CHECK (quantity > 0)
+);
+
+-- 索引：加速耗材记录查询
+CREATE INDEX idx_consumable_records_device_id ON consumable_records(device_id);
+CREATE INDEX idx_consumable_records_operator_id ON consumable_records(operator_id);
+CREATE INDEX idx_consumable_records_created_at ON consumable_records(created_at);
+CREATE INDEX idx_consumable_records_type ON consumable_records(consumable_type);
+
+-- ============================================
+-- 10. 系统审计日志表
 -- ============================================
 -- 记录所有用户操作，用于安全审计
 
@@ -271,7 +297,7 @@ CREATE TRIGGER devices_update_timestamp BEFORE UPDATE ON devices
     FOR EACH ROW EXECUTE FUNCTION update_timestamp();
 
 -- ============================================
--- 11. 视图（统计汇总）
+-- 12. 视图（统计汇总）
 -- ============================================
 
 -- 设备状态统计视图

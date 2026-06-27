@@ -15,17 +15,23 @@ function escapeCSV(value: string | number | undefined | null): string {
   return str
 }
 
-function downloadFile(content: string, filename: string, type: string) {
-  const BOM = '\uFEFF' // UTF-8 BOM for Excel compatibility
-  const blob = new Blob([BOM + content], { type: `${type};charset=utf-8` })
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
+function downloadFile(content: string, filename: string, type: string): boolean {
+  try {
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + content], { type: `${type};charset=utf-8` })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+    return true
+  } catch (err) {
+    console.error('文件下载失败:', err)
+    return false
+  }
 }
 
 export function exportDevicesCSV(
@@ -33,7 +39,8 @@ export function exportDevicesCSV(
   deviceTypes: DeviceType[],
   stations: Station[],
   counters: Counter[]
-) {
+): boolean {
+  try {
   const headers = ['设备名称', '设备类型', '序列号', '状态', '所属站点', '所属柜台', '创建时间', '更新时间']
   
   // 先按站点排序，然后同一站点内按柜台排序，备机放在最后
@@ -72,7 +79,7 @@ export function exportDevicesCSV(
       escapeCSV(device.name),
       escapeCSV(type?.name),
       escapeCSV(device.serialNumber),
-      escapeCSV(statusColors[device.status].label),
+      escapeCSV(statusColors[device.status]?.label),
       escapeCSV(device.status === 'standby' ? '库房（备机区）' : (station?.name || '')),
       escapeCSV(counter?.name),
       escapeCSV(new Date(device.createdAt).toLocaleString('zh-CN')),
@@ -81,10 +88,15 @@ export function exportDevicesCSV(
   })
 
   const csv = [headers.join(','), ...rows].join('\n')
-  downloadFile(csv, `设备列表_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  return downloadFile(csv, `设备列表_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  } catch (err) {
+    console.error('导出设备列表失败:', err)
+    return false
+  }
 }
 
-export function exportStationsCSV(stations: Station[], counters: Counter[], devices: Device[]) {
+export function exportStationsCSV(stations: Station[], counters: Counter[], devices: Device[]): boolean {
+  try {
   const headers = ['站点名称', '站点代码', '站点类型', '描述', '柜台数量', '设备数量', '创建时间']
   
   const rows = stations.map(station => {
@@ -94,7 +106,7 @@ export function exportStationsCSV(stations: Station[], counters: Counter[], devi
     return [
       escapeCSV(station.name),
       escapeCSV(station.code),
-      escapeCSV(stationTypeLabels[station.type]),
+      escapeCSV(stationTypeLabels[station.type] || ''),
       escapeCSV(station.description),
       escapeCSV(stationCounters.length),
       escapeCSV(stationDevices.length),
@@ -103,7 +115,11 @@ export function exportStationsCSV(stations: Station[], counters: Counter[], devi
   })
 
   const csv = [headers.join(','), ...rows].join('\n')
-  downloadFile(csv, `站点列表_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  return downloadFile(csv, `站点列表_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  } catch (err) {
+    console.error('导出站点列表失败:', err)
+    return false
+  }
 }
 
 export function exportChangeRecordsCSV(
@@ -111,7 +127,8 @@ export function exportChangeRecordsCSV(
   devices: Device[],
   stations: Station[],
   counters: Counter[]
-) {
+): boolean {
+  try {
   const headers = ['设备名称', '序列号', '原站点', '新站点', '原柜台', '新柜台', '原状态', '新状态', '变更原因', '操作员', '操作时间']
   
   const rows = records.map(record => {
@@ -128,8 +145,8 @@ export function exportChangeRecordsCSV(
       escapeCSV(toStation?.name),
       escapeCSV(fromCounter?.name),
       escapeCSV(toCounter?.name),
-      escapeCSV(statusColors[record.fromStatus].label),
-      escapeCSV(statusColors[record.toStatus].label),
+      escapeCSV(statusColors[record.fromStatus]?.label),
+      escapeCSV(statusColors[record.toStatus]?.label),
       escapeCSV(record.reason),
       escapeCSV(record.operatorName),
       escapeCSV(new Date(record.createdAt).toLocaleString('zh-CN')),
@@ -137,10 +154,15 @@ export function exportChangeRecordsCSV(
   })
 
   const csv = [headers.join(','), ...rows].join('\n')
-  downloadFile(csv, `更换记录_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  return downloadFile(csv, `更换记录_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  } catch (err) {
+    console.error('导出更换记录失败:', err)
+    return false
+  }
 }
 
-export function exportPaperRecordsCSV(records: PaperChangeRecord[], devices: Device[]) {
+export function exportPaperRecordsCSV(records: PaperChangeRecord[], devices: Device[]): boolean {
+  try {
   const headers = ['设备名称', '纸张类型', '数量', '操作员', '备注', '操作时间']
   
   const rows = records.map(record => {
@@ -157,7 +179,11 @@ export function exportPaperRecordsCSV(records: PaperChangeRecord[], devices: Dev
   })
 
   const csv = [headers.join(','), ...rows].join('\n')
-  downloadFile(csv, `换纸记录_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  return downloadFile(csv, `换纸记录_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  } catch (err) {
+    console.error('导出换纸记录失败:', err)
+    return false
+  }
 }
 
 // ==================== 导入功能 ====================
@@ -191,11 +217,16 @@ function parseCSV(content: string): string[][] {
 }
 
 // 导入设备模板
-export function downloadDeviceTemplate() {
+export function downloadDeviceTemplate(): boolean {
+  try {
   const headers = ['设备名称', '设备类型', '序列号', '状态', '所属站点', '所属柜台']
   const example = ['CUSS-B01', 'CUSS 自助值机机', 'CUSS2024010', '备机', 'A值机岛', '']
   const csv = [headers.join(','), example.join(',')].join('\n')
-  downloadFile(csv, `设备导入模板.csv`, 'text/csv')
+  return downloadFile(csv, `设备导入模板.csv`, 'text/csv')
+  } catch (err) {
+    console.error('下载设备模板失败:', err)
+    return false
+  }
 }
 
 export function parseDevicesCSV(
@@ -205,6 +236,10 @@ export function parseDevicesCSV(
   counters: Counter[]
 ): { devices: Omit<Device, 'id' | 'createdAt' | 'updatedAt'>[]; errors: string[] } {
   const rows = parseCSV(content)
+  console.log('parseDevicesCSV - 总行数:', rows.length)
+  console.log('parseDevicesCSV - 设备类型列表:', deviceTypes.map(t => t.name))
+  console.log('parseDevicesCSV - 站点列表:', stations.map(s => s.name))
+  
   if (rows.length < 2) {
     return { devices: [], errors: ['文件为空或格式不正确'] }
   }
@@ -213,42 +248,54 @@ export function parseDevicesCSV(
     '使用中': 'active',
     '备机': 'standby',
     '损坏': 'damaged',
-    '送修': 'repair'
+    '送修': 'repair',
   }
 
   const devices: Omit<Device, 'id' | 'createdAt' | 'updatedAt'>[] = []
   const errors: string[] = []
 
-  // Skip header row
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i]
+    console.log(`parseDevicesCSV - 第 ${i + 1} 行:`, row)
+    
     if (row.length < 4) {
-      errors.push(`第 ${i + 1} 行: 数据列数不足`)
+      errors.push(`第 ${i + 1} 行: 数据列数不足，期望至少4列`)
       continue
     }
 
     const [name, typeName, serialNumber, statusStr, stationName, counterName] = row
+    
+    console.log(`parseDevicesCSV - 第 ${i + 1} 行解析结果:`)
+    console.log(`  name: "${name}"`)
+    console.log(`  typeName: "${typeName}"`)
+    console.log(`  serialNumber: "${serialNumber}"`)
+    console.log(`  statusStr: "${statusStr}"`)
+    console.log(`  stationName: "${stationName}"`)
     
     if (!name || !typeName || !serialNumber) {
       errors.push(`第 ${i + 1} 行: 设备名称、类型和序列号不能为空`)
       continue
     }
 
-    const type = deviceTypes.find(t => t.name === typeName)
+    let type = deviceTypes.find(t => t.name === typeName)
     if (!type) {
-      errors.push(`第 ${i + 1} 行: 未找到设备类型 "${typeName}"`)
-      continue
+      if (!deviceTypes[0]) {
+        errors.push(`第 ${i + 1} 行: 系统中没有任何设备类型，无法导入`)
+        continue
+      }
+      type = deviceTypes[0]
+      errors.push(`第 ${i + 1} 行: 未找到设备类型 "${typeName}"，已使用默认类型 "${type.name}"。当前系统设备类型: ${deviceTypes.map(t => t.name).join(', ')}`)
     }
 
     const status = statusMap[statusStr] || 'standby'
     
-    let stationId = stations[0]?.id || ''
+    let stationId: string | undefined
     if (stationName) {
       const station = stations.find(s => s.name === stationName)
       if (station) {
         stationId = station.id
       } else {
-        errors.push(`第 ${i + 1} 行: 未找到站点 "${stationName}"，已使用默认站点`)
+        errors.push(`第 ${i + 1} 行: 未找到站点 "${stationName}"，该设备将作为备机不分配站点。当前系统站点: ${stations.map(s => s.name).join(', ')}`)
       }
     }
 
@@ -276,11 +323,16 @@ export function parseDevicesCSV(
 }
 
 // 导入站点模板
-export function downloadStationTemplate() {
+export function downloadStationTemplate(): boolean {
+  try {
   const headers = ['站点名称', '站点代码', '站点类型', '描述']
   const example = ['D值机岛', 'D', '值机岛', '国际航班值机区']
   const csv = [headers.join(','), example.join(',')].join('\n')
-  downloadFile(csv, `站点导入模板.csv`, 'text/csv')
+  return downloadFile(csv, `站点导入模板.csv`, 'text/csv')
+  } catch (err) {
+    console.error('下载站点模板失败:', err)
+    return false
+  }
 }
 
 export function parseStationsCSV(content: string): { 
@@ -288,6 +340,8 @@ export function parseStationsCSV(content: string): {
   errors: string[] 
 } {
   const rows = parseCSV(content)
+  console.log('parseStationsCSV - 总行数:', rows.length)
+  
   if (rows.length < 2) {
     return { stations: [], errors: ['文件为空或格式不正确'] }
   }
@@ -303,6 +357,8 @@ export function parseStationsCSV(content: string): {
 
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i]
+    console.log(`parseStationsCSV - 第 ${i + 1} 行:`, row)
+    
     if (row.length < 3) {
       errors.push(`第 ${i + 1} 行: 数据列数不足`)
       continue
@@ -310,12 +366,19 @@ export function parseStationsCSV(content: string): {
 
     const [name, code, typeStr, description] = row
     
+    console.log(`parseStationsCSV - 第 ${i + 1} 行解析结果:`)
+    console.log(`  name: "${name}"`)
+    console.log(`  code: "${code}"`)
+    console.log(`  typeStr: "${typeStr}"`)
+    console.log(`  description: "${description}"`)
+    
     if (!name || !code) {
       errors.push(`第 ${i + 1} 行: 站点名称和代码不能为空`)
       continue
     }
 
     const type = typeMap[typeStr] || 'checkin'
+    console.log(`parseStationsCSV - 转换后的 type: "${type}"`)
 
     stations.push({
       name,
@@ -326,15 +389,21 @@ export function parseStationsCSV(content: string): {
     })
   }
 
+  console.log('parseStationsCSV - 最终结果:', stations.length, '个站点')
   return { stations, errors }
 }
 
 // 导入用户模板
-export function downloadUserTemplate() {
+export function downloadUserTemplate(): boolean {
+  try {
   const headers = ['用户名', '密码', '姓名', '角色']
   const example = ['zhangsan', '123456', '张三', '普通用户']
   const csv = [headers.join(','), example.join(',')].join('\n')
-  downloadFile(csv, `用户导入模板.csv`, 'text/csv')
+  return downloadFile(csv, `用户导入模板.csv`, 'text/csv')
+  } catch (err) {
+    console.error('下载用户模板失败:', err)
+    return false
+  }
 }
 
 export function parseUsersCSV(content: string): { 
@@ -382,7 +451,8 @@ export function parseUsersCSV(content: string): {
 }
 
 // 导出用户
-export function exportUsersCSV(users: User[]) {
+export function exportUsersCSV(users: User[]): boolean {
+  try {
   const headers = ['用户名', '姓名', '角色', '创建时间']
   
   const rows = users.map(user => {
@@ -395,5 +465,9 @@ export function exportUsersCSV(users: User[]) {
   })
 
   const csv = [headers.join(','), ...rows].join('\n')
-  downloadFile(csv, `用户列表_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  return downloadFile(csv, `用户列表_${new Date().toLocaleDateString('zh-CN')}.csv`, 'text/csv')
+  } catch (err) {
+    console.error('导出用户列表失败:', err)
+    return false
+  }
 }

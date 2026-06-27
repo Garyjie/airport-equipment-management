@@ -76,41 +76,114 @@ export default function UsersPage() {
   })
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleImportUsers = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportUsers = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
 
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      const { users: parsedUsers, errors } = parseUsersCSV(content)
-      
-      if (errors.length > 0) {
-        toast.warning('导入警告', {
-          description: errors.join('\n'),
-        })
+    console.log('选择的文件:', file.name, file.type, file.size)
+    
+    if (!file.name.endsWith('.csv')) {
+      toast.error('请选择 CSV 格式的文件')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
       }
-      
-      if (parsedUsers.length > 0) {
-        let successCount = 0
-        for (const user of parsedUsers) {
-          // 检查用户名是否已存在
-          if (users.some(u => u.username === user.username)) {
+      return
+    }
+
+    const reader = new FileReader()
+    
+    reader.onerror = () => {
+      console.error('文件读取失败')
+      toast.error('文件读取失败，请重试')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+    
+    reader.onload = async (e) => {
+      try {
+        console.log('文件读取成功')
+        const arrayBuffer = e.target?.result as ArrayBuffer
+        
+        let content = ''
+        const encodings = ['GBK', 'GB2312', 'UTF-8']
+        for (const encoding of encodings) {
+          try {
+            const decoder = new TextDecoder(encoding)
+            content = decoder.decode(arrayBuffer)
+            console.log(`尝试编码 ${encoding}:`, content.substring(0, 50))
+            if (content.includes('用户名')) {
+              console.log(`使用编码 ${encoding} 成功解码`)
+              break
+            }
+          } catch {
             continue
           }
-          addUser(user)
-          successCount++
         }
-        toast.success(`成功导入 ${successCount} 个用户`)
-      } else if (errors.length === 0) {
-        toast.info('没有可导入的数据')
+        
+        console.log('文件内容长度:', content?.length)
+        
+        if (!content || content.trim().length === 0) {
+          toast.error('文件内容为空')
+          return
+        }
+        
+        const { users: parsedUsers, errors } = parseUsersCSV(content)
+        console.log('解析结果:', parsedUsers.length, '用户', errors.length, '错误')
+        
+        if (errors.length > 0) {
+          toast.warning('导入警告', {
+            description: errors.join('\n'),
+          })
+        }
+        
+        if (parsedUsers.length > 0) {
+          toast.info('正在导入用户，请稍候...')
+          let successCount = 0
+          let skipCount = 0
+          let errorCount = 0
+          for (const user of parsedUsers) {
+            if (users.some(u => u.username === user.username)) {
+              skipCount++
+              continue
+            }
+            try {
+              await addUser(user)
+              successCount++
+            } catch (err) {
+              console.error('添加用户失败:', err)
+              errorCount++
+            }
+          }
+          
+          let message = ''
+          if (successCount > 0) message += `成功导入 ${successCount} 个用户`
+          if (skipCount > 0) message += message ? `，${skipCount} 个已存在跳过` : `${skipCount} 个用户已存在`
+          if (errorCount > 0) message += message ? `，${errorCount} 个导入失败` : `${errorCount} 个用户导入失败`
+          
+          if (successCount > 0) {
+            toast.success(message || '导入完成')
+          } else if (skipCount > 0) {
+            toast.info(message)
+          } else if (errorCount > 0) {
+            toast.error(message)
+          } else {
+            toast.info('没有可导入的数据')
+          }
+        } else if (errors.length === 0) {
+          toast.info('CSV 文件中没有有效的用户数据')
+        }
+      } catch (err) {
+        console.error('导入处理失败:', err)
+        toast.error(err instanceof Error ? err.message : '导入处理失败')
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
       }
     }
-    reader.readAsText(file)
     
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
+    reader.readAsArrayBuffer(file)
   }, [users, addUser])
 
   useEffect(() => {
@@ -143,8 +216,7 @@ export default function UsersPage() {
     setDialogOpen(true)
   }
 
-  const handleSubmit = () => {
-    // 表单验证
+  const handleSubmit = async () => {
     if (!formData.username.trim()) {
       toast.error('请输入用户名')
       return
@@ -158,22 +230,26 @@ export default function UsersPage() {
       return
     }
     
-    if (editingUser) {
-      const updates: Partial<User> = {
-        username: formData.username,
-        name: formData.name,
-        role: formData.role,
+    try {
+      if (editingUser) {
+        const updates: Partial<User> = {
+          username: formData.username,
+          name: formData.name,
+          role: formData.role,
+        }
+        if (formData.password) {
+          updates.password = formData.password
+        }
+        await updateUser(editingUser.id, updates)
+        toast.success('用户信息已更新')
+      } else {
+        await addUser(formData)
+        toast.success('用户已添加')
       }
-      if (formData.password) {
-        updates.password = formData.password
-      }
-      updateUser(editingUser.id, updates)
-      toast.success('用户信息已更新')
-    } else {
-      addUser(formData)
-      toast.success('用户已添加')
+      setDialogOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
     }
-    setDialogOpen(false)
   }
 
   const handleDelete = (id: string) => {
@@ -185,9 +261,14 @@ export default function UsersPage() {
       open: true,
       title: '确认删除用户',
       description: '确定要删除这个用户吗？此操作无法撤销。',
-      onConfirm: () => {
-        deleteUser(id)
-        toast.success('用户已删除')
+      onConfirm: async () => {
+        try {
+          await deleteUser(id)
+          toast.success('用户已删除')
+          setConfirmDialog(prev => ({ ...prev, open: false }))
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : '删除失败')
+        }
       },
     })
   }
@@ -202,6 +283,21 @@ export default function UsersPage() {
 
   if (!currentUser || currentUser.role !== 'admin') {
     return null
+  }
+
+  const handleImportClick = () => {
+    console.log('导入按钮点击了')
+    console.log('fileInputRef.current:', fileInputRef.current)
+    // 使用延时确保 ref 已经正确关联
+    setTimeout(() => {
+      console.log('setTimeout 回调执行')
+      if (fileInputRef.current) {
+        console.log('触发文件选择对话框')
+        fileInputRef.current.click()
+      } else {
+        console.error('fileInputRef.current 为空，无法触发文件选择')
+      }
+    }, 0)
   }
 
   return (
@@ -224,7 +320,16 @@ export default function UsersPage() {
                 <FileDown className="h-4 w-4 mr-2" />
                 模板
               </Button>
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={(e) => {
+                  console.log('导入 Button onClick 触发')
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleImportClick()
+                }}
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 导入
               </Button>

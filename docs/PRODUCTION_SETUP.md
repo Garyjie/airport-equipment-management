@@ -26,13 +26,34 @@
 
 - **操作系统**: Ubuntu 22.04 LTS / CentOS 8+
 - **Node.js**: 18.17.0+ (LTS)
-- **数据库**: PostgreSQL 15+ 或 MySQL 8.0+
+- **数据库**: PostgreSQL 15+ 或 MySQL 8.0+（推荐）
 - **Web服务器**: Nginx 1.20+
 - **进程管理**: PM2 5.0+
 
 ---
 
 ## 数据库配置
+
+### Prisma ORM 迁移
+
+本项目使用 Prisma ORM 管理数据库迁移，不建议手动执行 SQL 脚本。
+
+```bash
+# 生成 Prisma 客户端（每次修改 schema 后执行）
+npm run prisma:generate
+
+# 创建新的迁移文件（修改 schema 后执行）
+npx prisma migrate dev --name <migration_name>
+
+# 运行所有迁移（部署时执行）
+npm run prisma:migrate
+
+# 查看迁移状态
+npx prisma migrate status
+
+# 重置数据库（仅开发环境使用）
+npx prisma migrate reset
+```
 
 ### PostgreSQL 详细配置
 
@@ -162,6 +183,11 @@ sudo ufw enable
 - 包含大小写字母、数字和特殊字符
 - 定期更换（建议每 90 天）
 
+#### JWT Secret
+- 长度至少 32 位
+- 使用随机生成的字符串
+- 不要提交到代码仓库
+
 #### 环境变量安全
 ```bash
 # 设置文件权限
@@ -181,6 +207,7 @@ chmod 600 .env.production
 - [ ] 设置审计日志
 - [ ] 限制文件上传大小和类型
 - [ ] 配置 CORS 策略
+- [ ] 使用强密码策略
 
 ### Nginx 安全配置
 
@@ -222,52 +249,50 @@ server {
 
 ### 数据库索引优化
 
-#### PostgreSQL 索引
+> **注意**: 本项目使用 Prisma ORM，索引会通过 schema.prisma 文件定义。
+> 以下索引建议可通过在 schema.prisma 中添加 `@@index` 或 `@unique` 实现。
+
+#### 推荐索引
 
 ```sql
+-- PostgreSQL / MySQL 通用索引建议
+
 -- 设备表索引
 CREATE INDEX idx_devices_station_id ON devices(station_id);
 CREATE INDEX idx_devices_counter_id ON devices(counter_id);
 CREATE INDEX idx_devices_status ON devices(status);
-CREATE INDEX idx_devices_serial_number ON devices(serial_number);
-CREATE INDEX idx_devices_device_type_id ON devices(device_type_id);
+CREATE INDEX idx_devices_type_id ON devices(type_id);
+CREATE INDEX idx_devices_is_active ON devices(is_active);
 
 -- 变更记录表索引
 CREATE INDEX idx_device_change_records_device_id ON device_change_records(device_id);
 CREATE INDEX idx_device_change_records_created_at ON device_change_records(created_at);
 CREATE INDEX idx_device_change_records_operator_id ON device_change_records(operator_id);
+CREATE INDEX idx_device_change_records_from_station_id ON device_change_records(from_station_id);
+CREATE INDEX idx_device_change_records_to_station_id ON device_change_records(to_station_id);
 
 -- 站点和柜台索引
 CREATE INDEX idx_stations_type ON stations(type);
+CREATE INDEX idx_stations_is_active ON stations(is_active);
 CREATE INDEX idx_counters_station_id ON counters(station_id);
+CREATE INDEX idx_counters_is_active ON counters(is_active);
 
 -- 换纸记录表索引
 CREATE INDEX idx_paper_change_records_device_id ON paper_change_records(device_id);
 CREATE INDEX idx_paper_change_records_created_at ON paper_change_records(created_at);
-```
 
-#### MySQL 索引
+-- 耗材记录表索引
+CREATE INDEX idx_consumable_records_device_id ON consumable_records(device_id);
+CREATE INDEX idx_consumable_records_created_at ON consumable_records(created_at);
 
-```sql
--- 设备表索引
-ALTER TABLE devices ADD INDEX idx_devices_station_id(station_id);
-ALTER TABLE devices ADD INDEX idx_devices_counter_id(counter_id);
-ALTER TABLE devices ADD INDEX idx_devices_status(status);
-ALTER TABLE devices ADD INDEX idx_devices_serial_number(serial_number);
-ALTER TABLE devices ADD INDEX idx_devices_device_type_id(device_type_id);
+-- 用户表索引
+CREATE INDEX idx_users_role ON users(role);
+CREATE INDEX idx_users_is_active ON users(is_active);
 
--- 变更记录表索引
-ALTER TABLE device_change_records ADD INDEX idx_device_change_records_device_id(device_id);
-ALTER TABLE device_change_records ADD INDEX idx_device_change_records_created_at(created_at);
-ALTER TABLE device_change_records ADD INDEX idx_device_change_records_operator_id(operator_id);
-
--- 站点和柜台索引
-ALTER TABLE stations ADD INDEX idx_stations_type(type);
-ALTER TABLE counters ADD INDEX idx_counters_station_id(station_id);
-
--- 换纸记录表索引
-ALTER TABLE paper_change_records ADD INDEX idx_paper_change_records_device_id(device_id);
-ALTER TABLE paper_change_records ADD INDEX idx_paper_change_records_created_at(created_at);
+-- 审计日志索引
+CREATE INDEX idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at);
+CREATE INDEX idx_audit_logs_action ON audit_logs(action);
 ```
 
 ### 查询优化
@@ -280,7 +305,7 @@ ALTER TABLE paper_change_records ADD INDEX idx_paper_change_records_created_at(c
 pgBadger /var/log/postgresql/postgresql-*.log
 
 # 分析查询性能
-EXPLAIN ANALYZE SELECT * FROM devices WHERE status = 'active';
+EXPLAIN ANALYZE SELECT * FROM devices WHERE status = 'active' AND is_active = true;
 ```
 
 **MySQL:**
@@ -289,7 +314,42 @@ EXPLAIN ANALYZE SELECT * FROM devices WHERE status = 'active';
 mysqldumpslow /var/log/mysql/slow.log
 
 # 分析查询性能
-EXPLAIN SELECT * FROM devices WHERE status = 'active';
+EXPLAIN SELECT * FROM devices WHERE status = 'active' AND is_active = true;
+```
+
+### 应用性能优化
+
+#### 缓存策略
+
+```bash
+# 启用 Redis 缓存（可选）
+# 安装 Redis
+sudo apt-get install redis-server
+sudo systemctl start redis-server
+
+# 在应用中配置 Redis 缓存
+# 缓存用户信息、设备类型、站点信息等不频繁变化的数据
+```
+
+#### 连接池配置
+
+**PostgreSQL 连接池（PGBouncer）：**
+```bash
+# 安装 PGBouncer
+sudo apt-get install pgbouncer
+
+# 配置 /etc/pgbouncer/pgbouncer.ini
+[databases]
+airport_equipment = host=localhost port=5432 dbname=airport_equipment
+
+[pgbouncer]
+listen_port = 6432
+listen_addr = *
+auth_type = md5
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 100
+default_pool_size = 20
 ```
 
 ---
@@ -380,6 +440,7 @@ tar -czf "$BACKUP_DIR/app_backup_$DATE.tar.gz" \
     --exclude="node_modules" \
     --exclude=".next" \
     --exclude="*.log" \
+    --exclude="prisma/*.db" \
     $APP_DIR
 
 echo "App backup completed: $BACKUP_DIR/app_backup_$DATE.tar.gz"
@@ -409,8 +470,8 @@ pm2 notify
 ```bash
 #!/bin/bash
 
-APP_NAME="airport-equipment"
-PORT=3000
+APP_NAME="airport-backend"
+PORT=5000
 
 # 检查应用是否运行
 if ! pm2 list | grep -q $APP_NAME; then
@@ -453,6 +514,15 @@ SELECT * FROM pg_stat_statements ORDER BY total_time DESC LIMIT 10;
 -- 查看表大小
 SELECT relname, pg_size_pretty(pg_total_relation_size(relid)) 
 FROM pg_catalog.pg_statio_user_tables ORDER BY pg_total_relation_size(relid) DESC;
+
+-- 查看索引使用情况
+SELECT 
+    idx.relname AS index_name,
+    tbl.relname AS table_name,
+    idx_scan AS index_scans
+FROM pg_stat_user_indexes idx
+JOIN pg_class tbl ON idx.schemaname = tbl.schemaname AND idx.schemaname = 'public'
+ORDER BY idx_scan ASC;
 ```
 
 #### MySQL 监控查询
@@ -470,6 +540,16 @@ SELECT table_name,
        index_length/1024/1024 AS index_size_mb 
 FROM information_schema.tables 
 WHERE table_schema = 'airport_equipment';
+
+-- 查看索引使用情况
+SELECT 
+    TABLE_NAME,
+    INDEX_NAME,
+    SEQ_IN_INDEX,
+    COLUMN_NAME,
+    CARDINALITY
+FROM INFORMATION_SCHEMA.STATISTICS 
+WHERE TABLE_SCHEMA = 'airport_equipment';
 ```
 
 ---
@@ -482,8 +562,8 @@ WHERE table_schema = 'airport_equipment';
 
 **检查步骤：**
 1. 检查 Node.js 版本：`node --version`
-2. 检查端口占用：`netstat -tlnp | grep 3000`
-3. 查看 PM2 日志：`pm2 logs airport-equipment`
+2. 检查端口占用：`netstat -tlnp | grep 3000` 或 `netstat -tlnp | grep 5000`
+3. 查看 PM2 日志：`pm2 logs airport-backend` 或 `pm2 logs airport-frontend`
 4. 检查环境变量：`cat .env.production`
 5. 检查依赖：`npm install`
 
@@ -513,6 +593,8 @@ WHERE table_schema = 'airport_equipment';
    sudo ufw status
    ```
 
+4. 检查 `.env` 文件中的 `DATABASE_URL` 是否正确
+
 #### 性能问题
 
 **排查步骤：**
@@ -520,6 +602,15 @@ WHERE table_schema = 'airport_equipment';
 2. 查看慢查询日志
 3. 检查数据库索引使用情况
 4. 检查应用内存使用：`pm2 monit`
+5. 查看数据库连接池状态
+
+#### JWT 认证失败
+
+**检查步骤：**
+1. 检查 `JWT_SECRET` 环境变量是否配置
+2. 检查 Token 是否过期
+3. 检查 Token 是否正确传递（Authorization header）
+4. 检查后端日志中的认证错误
 
 ---
 
@@ -530,10 +621,12 @@ WHERE table_schema = 'airport_equipment';
 ```bash
 #!/bin/bash
 
-APP_NAME="airport-equipment"
+APP_NAME_BACKEND="airport-backend"
+APP_NAME_FRONTEND="airport-frontend"
 
 echo "停止应用..."
-pm2 stop $APP_NAME
+pm2 stop $APP_NAME_BACKEND
+pm2 stop $APP_NAME_FRONTEND
 
 echo "拉取最新代码..."
 cd /path/to/airport-equipment-management
@@ -542,11 +635,18 @@ git pull
 echo "安装依赖..."
 npm install
 
+echo "生成 Prisma 客户端..."
+npm run prisma:generate
+
+echo "运行数据库迁移..."
+npm run prisma:migrate
+
 echo "构建应用..."
 npm run build
 
 echo "启动应用..."
-pm2 start $APP_NAME
+pm2 start $APP_NAME_BACKEND
+pm2 start $APP_NAME_FRONTEND
 
 echo "应用已重启"
 ```
@@ -573,6 +673,20 @@ DELETE FROM device_change_records
 WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
 EOF
 
+echo "清理超过 30 天的换纸记录..."
+
+# PostgreSQL
+psql -U airport_admin -d airport_equipment <<EOF
+DELETE FROM paper_change_records 
+WHERE created_at < NOW() - INTERVAL '30 days';
+EOF
+
+# MySQL
+mysql -u airport_admin -p airport_equipment <<EOF
+DELETE FROM paper_change_records 
+WHERE created_at < DATE_SUB(NOW(), INTERVAL 30 DAY);
+EOF
+
 echo "清理完成"
 ```
 
@@ -582,14 +696,12 @@ echo "清理完成"
 #!/bin/bash
 
 # 数据库迁移脚本模板
-# 使用前请备份数据库
+# 使用 Prisma 迁移工具执行，不要手动执行此脚本
 
 echo "开始数据库迁移..."
 
-# 添加新字段示例
-# psql -U airport_admin -d airport_equipment <<EOF
-# ALTER TABLE devices ADD COLUMN new_column VARCHAR(255);
-# EOF
+# 使用 Prisma 执行迁移
+npx prisma migrate deploy
 
 echo "数据库迁移完成"
 ```
@@ -602,23 +714,23 @@ echo "数据库迁移完成"
 
 1. **备份数据**：使用导出功能导出所有数据为 CSV
 2. **安装数据库**：根据需要选择 PostgreSQL 或 MySQL
-3. **导入 schema**：执行 `docs/schema_postgresql.sql` 或 `docs/schema_mysql.sql`
-4. **导入初始数据**：执行 `docs/initial_data.sql`
+3. **配置环境变量**：创建 `.env.production` 文件，设置正确的 `DATABASE_URL`
+4. **初始化数据库**：执行 `npm run prisma:generate && npm run prisma:migrate && npm run prisma:seed`
 5. **迁移数据**：将导出的 CSV 数据导入到数据库
-6. **配置环境变量**：创建 `.env.production` 文件
-7. **构建应用**：`npm run build`
-8. **启动应用**：`pm2 start npm --name "airport-equipment" -- start`
+6. **构建应用**：`npm run build`
+7. **启动应用**：`pm2 start npm --name "airport-backend" -- server` 和 `pm2 start npm --name "airport-frontend" -- start`
 
 ### 版本升级
 
 1. **备份数据**
-2. **停止应用**：`pm2 stop airport-equipment`
+2. **停止应用**：`pm2 stop airport-backend` 和 `pm2 stop airport-frontend`
 3. **拉取更新**：`git pull`
 4. **安装依赖**：`npm install`
-5. **运行迁移**：`npm run migrate`（如有）
-6. **构建应用**：`npm run build`
-7. **启动应用**：`pm2 start airport-equipment`
-8. **验证功能**：访问应用确认正常运行
+5. **生成 Prisma 客户端**：`npm run prisma:generate`
+6. **运行迁移**：`npm run prisma:migrate`
+7. **构建应用**：`npm run build`
+8. **启动应用**：`pm2 start airport-backend` 和 `pm2 start airport-frontend`
+9. **验证功能**：访问应用确认正常运行
 
 ---
 
@@ -626,8 +738,8 @@ echo "数据库迁移完成"
 
 生产环境配置的关键要点：
 
-1. **安全第一**：配置防火墙、使用 HTTPS、定期更新
-2. **性能优化**：添加数据库索引、优化查询、配置缓存
+1. **安全第一**：配置防火墙、使用 HTTPS、定期更新、使用强密码
+2. **性能优化**：添加数据库索引、优化查询、配置缓存、使用连接池
 3. **备份策略**：定期备份数据库和代码、测试恢复流程
 4. **监控告警**：实时监控应用状态、及时发现问题
 5. **文档记录**：记录所有配置变更、便于维护和排查

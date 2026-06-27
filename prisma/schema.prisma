@@ -1,0 +1,159 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  username  String    @unique
+  password  String
+  name      String
+  role      String    @default("user")
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  changeRecords    DeviceChangeRecord[]
+  paperRecords     PaperChangeRecord[]
+  consumableRecords ConsumableRecord[]
+  auditLogs        AuditLog[]
+}
+
+model Station {
+  id          String    @id @default(uuid())
+  name        String
+  code        String    @unique
+  type        String
+  description String?
+  positionX   Int       @default(0)
+  positionY   Int       @default(0)
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  counters         Counter[]
+  devices          Device[]
+  changeRecordsFrom DeviceChangeRecord[] @relation("fromStation")
+  changeRecordsTo   DeviceChangeRecord[] @relation("toStation")
+}
+
+model Counter {
+  id        String    @id @default(uuid())
+  stationId String
+  name      String
+  position  Int
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  station          Station @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  devices          Device[]
+  changeRecordsFrom DeviceChangeRecord[] @relation("fromCounter")
+  changeRecordsTo   DeviceChangeRecord[] @relation("toCounter")
+}
+
+model DeviceType {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  category    String
+  description String?
+  icon        String?
+  attributes  String    @default("{}")
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  devices Device[]
+}
+
+model Device {
+  id            String    @id @default(uuid())
+  name          String
+  typeId        String
+  serialNumber  String    @unique
+  status        String    @default("standby")
+  stationId     String?
+  counterId     String?
+  position      Int       @default(0)
+  customData    String    @default("{}")
+  notes         String?
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  type           DeviceType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  station        Station?   @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  counter        Counter?   @relation(fields: [counterId], references: [id], onDelete: SetNull)
+  changeRecords  DeviceChangeRecord[]
+  paperRecords   PaperChangeRecord[]
+  consumableRecords ConsumableRecord[]
+}
+
+model DeviceChangeRecord {
+  id            String    @id @default(uuid())
+  deviceId      String
+  fromStationId String?
+  toStationId   String?
+  fromCounterId String?
+  toCounterId   String?
+  fromStatus    String?
+  toStatus      String?
+  reason        String
+  operatorId    String
+  operatorName  String
+  notes         String?
+  createdAt     DateTime  @default(now())
+
+  device          Device   @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  operator        User     @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+  fromStation     Station? @relation("fromStation", fields: [fromStationId], references: [id], onDelete: SetNull)
+  toStation       Station? @relation("toStation", fields: [toStationId], references: [id], onDelete: SetNull)
+  fromCounter     Counter? @relation("fromCounter", fields: [fromCounterId], references: [id], onDelete: SetNull)
+  toCounter       Counter? @relation("toCounter", fields: [toCounterId], references: [id], onDelete: SetNull)
+}
+
+model PaperChangeRecord {
+  id            String    @id @default(uuid())
+  deviceId      String
+  paperType     String
+  quantity      Int       @default(1)
+  notes         String?
+  operatorId    String
+  operatorName  String
+  createdAt     DateTime  @default(now())
+
+  device        Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  operator      User      @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+}
+
+model ConsumableRecord {
+  id              String    @id @default(uuid())
+  deviceId        String
+  consumableType  String
+  operatorId      String
+  operatorName    String
+  quantity        Int       @default(1)
+  notes           String?
+  createdAt       DateTime  @default(now())
+
+  device          Device    @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  operator        User      @relation(fields: [operatorId], references: [id], onDelete: Restrict)
+}
+
+model AuditLog {
+  id            String    @id @default(uuid())
+  userId        String?
+  action        String
+  resourceType  String
+  resourceId    String?
+  details       String    @default("{}")
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime  @default(now())
+
+  user          User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+}

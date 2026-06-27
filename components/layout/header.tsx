@@ -23,17 +23,18 @@ interface HeaderProps {
 }
 
 export function Header({ title, description, actions }: HeaderProps) {
-  const { devices, currentUser, logout } = useStoreContext()
+  const { devices, currentUser, logout, refreshData } = useStoreContext()
   const { theme, toggleTheme, mounted } = useTheme()
   const [lastRefresh, setLastRefresh] = useState(new Date())
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   const alertCount = devices.filter(d => d.status === 'damaged' || d.status === 'repair').length
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true)
+    await refreshData()
     setLastRefresh(new Date())
-    setTimeout(() => setIsRefreshing(false), 1000)
+    setIsRefreshing(false)
   }
 
   // Auto refresh every 30 seconds

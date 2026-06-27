@@ -16,8 +16,9 @@
 -- 5. 设备表
 -- 6. 设备更换记录表
 -- 7. 换纸记录表
--- 8. 系统审计日志表
--- 9. 视图（统计汇总）
+-- 8. 耗材记录表
+-- 9. 系统审计日志表
+-- 10. 视图（统计汇总）
 
 SET NAMES utf8mb4;
 SET CHARACTER SET utf8mb4;
@@ -204,7 +205,32 @@ CREATE TABLE paper_change_records (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='换纸记录表';
 
 -- ============================================
--- 8. 系统审计日志表
+-- 8. 耗材记录表
+-- ============================================
+-- 记录设备耗材更换情况（通用耗材）
+
+CREATE TABLE consumable_records (
+    id CHAR(36) PRIMARY KEY COMMENT '记录ID (UUID)',
+    device_id CHAR(36) NOT NULL COMMENT '设备ID',
+    consumable_type VARCHAR(50) NOT NULL COMMENT '耗材类型',
+    quantity INT NOT NULL DEFAULT 1 COMMENT '数量',
+    notes TEXT COMMENT '备注',
+    operator_id CHAR(36) NOT NULL COMMENT '操作员ID',
+    operator_name VARCHAR(100) NOT NULL COMMENT '操作员名称',
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    
+    KEY idx_consumable_device_id (device_id),
+    KEY idx_consumable_operator_id (operator_id),
+    KEY idx_consumable_created_at (created_at),
+    KEY idx_consumable_type (consumable_type),
+    CONSTRAINT consumable_records_device_id_fk FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+    CONSTRAINT consumable_records_operator_id_fk FOREIGN KEY (operator_id) REFERENCES users(id) ON DELETE RESTRICT,
+    CONSTRAINT consumable_type_not_empty CHECK (CHAR_LENGTH(consumable_type) > 0),
+    CONSTRAINT consumable_quantity_positive CHECK (quantity > 0)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='耗材记录表';
+
+-- ============================================
+-- 9. 系统审计日志表
 -- ============================================
 -- 记录所有用户操作，用于安全审计
 
@@ -227,7 +253,7 @@ CREATE TABLE audit_logs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='审计日志表';
 
 -- ============================================
--- 9. 视图（统计汇总）
+-- 10. 视图（统计汇总）
 -- ============================================
 
 -- 设备状态统计视图
@@ -288,4 +314,5 @@ COMMIT;
 -- 3. 脚本使用 MySQL 特有的语法（ENGINE=InnoDB、GROUP_CONCAT）
 -- 4. 所有外键约束都设置了合理的 ON DELETE 行为
 -- 5. 索引已针对常用查询场景进行优化
--- 6. 注意：MySQL 8.0+ 版本支持 CHECK 约束和 JSON 类型
+-- 6. 包含 10 张表和 3 个统计视图
+-- 7. 注意：MySQL 8.0+ 版本支持 CHECK 约束和 JSON 类型

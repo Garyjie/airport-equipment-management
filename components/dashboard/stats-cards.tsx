@@ -94,8 +94,7 @@ export function StatsCards() {
   const renderDrillDownContent = () => {
     switch (drillDown) {
       case 'total':
-        // 按站点分组设备，备机放在最后
-        const groupedDevices = devices.reduce((acc, device) => {
+        const groupedByStation = devices.reduce((acc, device) => {
           const key = device.status === 'standby' || !device.stationId ? '库房（备机区）' : getStationName(device.stationId)
           if (!acc[key]) {
             acc[key] = []
@@ -104,8 +103,7 @@ export function StatsCards() {
           return acc
         }, {} as Record<string, typeof devices>)
 
-        // 排序分组：有站点的在前，备机在后，同一站点内按设备名称排序
-        const sortedGroupKeys = Object.keys(groupedDevices).sort((a, b) => {
+        const sortedStationKeys = Object.keys(groupedByStation).sort((a, b) => {
           const aIsStandby = a === '库房（备机区）'
           const bIsStandby = b === '库房（备机区）'
           if (aIsStandby && !bIsStandby) return 1
@@ -113,46 +111,67 @@ export function StatsCards() {
           return a.localeCompare(b, 'zh-CN')
         })
 
-        sortedGroupKeys.forEach(key => {
-          groupedDevices[key].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN'))
-        })
-
         return (
           <>
             <DialogHeader>
               <DialogTitle>全部设备 ({devices.length})</DialogTitle>
             </DialogHeader>
-            <ScrollArea className="max-h-[60vh]">
-              <div className="space-y-4">
-                {sortedGroupKeys.map(stationName => (
-                  <div key={stationName} className="border-b border-border/50 pb-4 last:border-b-0">
-                    <div className="flex items-center gap-2 mb-3">
-                      <div className="w-2 h-2 rounded-full bg-primary"></div>
-                      <span className="font-medium text-sm">{stationName}</span>
-                      <span className="text-xs text-muted-foreground">({groupedDevices[stationName].length}台)</span>
+            <ScrollArea className="max-h-[60vh] w-full overflow-x-auto">
+              <div className="space-y-6 min-w-max">
+                {sortedStationKeys.map(stationName => {
+                  const stationDevices = groupedByStation[stationName]
+                  const groupedByCounter = stationDevices.reduce((acc, device) => {
+                    const counterName = getCounterName(device.counterId)
+                    const key = counterName === '-' ? '独立设备' : counterName
+                    if (!acc[key]) {
+                      acc[key] = []
+                    }
+                    acc[key].push(device)
+                    return acc
+                  }, {} as Record<string, typeof devices>)
+                  
+                  const sortedCounterKeys = Object.keys(groupedByCounter).sort((a, b) => {
+                    if (a === '独立设备') return 1
+                    if (b === '独立设备') return -1
+                    return a.localeCompare(b, 'zh-CN')
+                  })
+
+                  return (
+                    <div key={stationName} className="border-b border-border/50 pb-4 last:border-b-0">
+                      <div className="flex items-center gap-2 mb-4">
+                        <div className="w-2 h-2 rounded-full bg-primary"></div>
+                        <span className="font-semibold text-base">{stationName}</span>
+                        <span className="text-xs text-muted-foreground">({stationDevices.length}台)</span>
+                      </div>
+                      <div className="space-y-4 pl-4">
+                        {sortedCounterKeys.map(counterName => (
+                          <div key={counterName}>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground/50"></div>
+                              <span className="text-sm font-medium text-muted-foreground">{counterName}</span>
+                              <span className="text-xs text-muted-foreground">({groupedByCounter[counterName].length}台)</span>
+                            </div>
+                            <div className="space-y-1">
+                                {groupedByCounter[counterName].sort((a, b) => a.name.localeCompare(b.name, 'zh-CN')).map(device => {
+                                  const status = statusColors[device.status]
+                                  return (
+                                    <div key={device.id} className="flex items-center gap-3 py-1.5 px-2 rounded hover:bg-muted/50 text-sm">
+                                      <span className="font-medium truncate w-[130px]">{device.name}</span>
+                                      <span className="text-muted-foreground truncate w-[110px]">{getDeviceTypeName(device.typeId)}</span>
+                                      <Badge className={`${status.bg} text-white text-xs shrink-0`}>
+                                        {status.label}
+                                      </Badge>
+                                      <span className="font-mono text-xs text-muted-foreground truncate w-[110px]">{device.serialNumber}</span>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <Table>
-                      <TableBody>
-                        {groupedDevices[stationName].map(device => {
-                          const status = statusColors[device.status]
-                          return (
-                            <TableRow key={device.id} className="hover:bg-muted/50">
-                              <TableCell className="font-medium">{device.name}</TableCell>
-                              <TableCell>{getDeviceTypeName(device.typeId)}</TableCell>
-                              <TableCell>
-                                <Badge className={`${status.bg} text-white`}>
-                                  {status.label}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="font-mono text-xs">{device.serialNumber}</TableCell>
-                              <TableCell>{getCounterName(device.counterId)}</TableCell>
-                            </TableRow>
-                          )
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             </ScrollArea>
           </>
@@ -312,7 +331,7 @@ export function StatsCards() {
       </div>
 
       <Dialog open={drillDown !== null} onOpenChange={(open) => !open && setDrillDown(null)}>
-        <DialogContent className="max-w-3xl">
+        <DialogContent className="max-w-5xl max-h-[70vh] overflow-hidden">
           {renderDrillDownContent()}
         </DialogContent>
       </Dialog>

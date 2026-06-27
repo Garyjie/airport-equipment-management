@@ -8,6 +8,7 @@ import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import {
   Table,
@@ -80,10 +81,18 @@ export default function DevicesPage() {
     title: string
     description?: string
     onConfirm: () => void
+    variant?: 'default' | 'destructive' | 'warning'
   }>({
     open: false,
     title: '',
     onConfirm: () => {},
+  })
+  const [statusChangeDialog, setStatusChangeDialog] = useState({
+    open: false,
+    deviceId: '',
+    deviceName: '',
+    targetStatus: '' as DeviceStatus,
+    reason: '',
   })
 
   useEffect(() => {
@@ -176,8 +185,7 @@ export default function DevicesPage() {
     setDialogOpen(true)
   }
 
-  const handleSubmit = () => {
-    // 表单验证
+  const handleSubmit = async () => {
     if (!formData.name.trim()) {
       toast.error('请输入设备名称')
       return
@@ -187,21 +195,25 @@ export default function DevicesPage() {
       return
     }
     
-    if (editingDevice) {
-      updateDevice(editingDevice.id, {
-        ...formData,
-        stationId: formData.stationId === 'none' ? '' : formData.stationId,
-      })
-      toast.success('设备信息已更新')
-    } else {
-      addDevice({
-        ...formData,
-        stationId: formData.stationId === 'none' ? '' : formData.stationId,
-        position: devices.filter(d => d.stationId === (formData.stationId === 'none' ? '' : formData.stationId)).length + 1,
-      })
-      toast.success('设备已添加')
+    try {
+      if (editingDevice) {
+        await updateDevice(editingDevice.id, {
+          ...formData,
+          stationId: formData.stationId === 'none' ? '' : formData.stationId,
+        })
+        toast.success('设备信息已更新')
+      } else {
+        await addDevice({
+          ...formData,
+          stationId: formData.stationId === 'none' ? '' : formData.stationId,
+          position: devices.filter(d => d.stationId === (formData.stationId === 'none' ? '' : formData.stationId)).length + 1,
+        })
+        toast.success('设备已添加')
+      }
+      setDialogOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
     }
-    setDialogOpen(false)
   }
 
   const handleDelete = (id: string) => {
@@ -209,56 +221,216 @@ export default function DevicesPage() {
       open: true,
       title: '确认删除',
       description: '确定要删除这个设备吗？此操作无法撤销。',
-      onConfirm: () => {
-        deleteDevice(id)
-        toast.success('设备已删除')
+      onConfirm: async () => {
+        try {
+          await deleteDevice(id)
+          toast.success('设备已删除')
+          setConfirmDialog(prev => ({ ...prev, open: false }))
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : '删除失败')
+        }
       },
     })
   }
 
-  const handleStatusChange = (deviceId: string, status: DeviceStatus) => {
-    changeDeviceStatus(deviceId, status, '手动状态变更')
+  const handleStatusChange = (deviceId: string, status: DeviceStatus, deviceName: string) => {
+    const statusLabels: Record<DeviceStatus, string> = {
+      active: '使用中',
+      standby: '备机',
+      damaged: '损坏',
+      repair: '送修',
+    }
+    const needReason = status === 'damaged' || status === 'repair'
+    
+    if (needReason) {
+      setStatusChangeDialog({
+        open: true,
+        deviceId,
+        deviceName,
+        targetStatus: status,
+        reason: '',
+      })
+    } else {
+      setConfirmDialog({
+        open: true,
+        title: `确认将设备设为${statusLabels[status]}`,
+        description: `确定要将「${deviceName}」的状态设置为${statusLabels[status]}吗？`,
+        variant: status === 'active' ? 'default' : 'warning',
+        onConfirm: async () => {
+          try {
+            await changeDeviceStatus(deviceId, status, '手动状态变更')
+            toast.success(`设备状态已更新为${statusLabels[status]}`)
+            setConfirmDialog(prev => ({ ...prev, open: false }))
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : '操作失败')
+          }
+        },
+      })
+    }
+  }
+
+  const handleStatusChangeConfirm = async () => {
+    const statusLabels: Record<DeviceStatus, string> = {
+      active: '使用中',
+      standby: '备机',
+      damaged: '损坏',
+      repair: '送修',
+    }
+    const { deviceId, targetStatus, reason } = statusChangeDialog
+    if (targetStatus === 'damaged' || targetStatus === 'repair') {
+      if (!reason.trim()) {
+        toast.error('请填写变更原因')
+        return
+      }
+    }
+    try {
+      await changeDeviceStatus(deviceId, targetStatus, reason || '手动状态变更')
+      toast.success(`设备状态已更新为'${statusLabels[targetStatus]}`)
+      setStatusChangeDialog(prev => ({ ...prev, open: false }))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
+    }
   }
 
   const selectedType = deviceTypes.find(t => t.id === formData.typeId)
   const stationCounters = counters.filter(c => c.stationId === formData.stationId)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleImportDevices = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (!file) return
-
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      const { devices: parsedDevices, errors } = parseDevicesCSV(content, deviceTypes, stations, counters)
-      
-      if (errors.length > 0) {
-        toast.warning(`导入警告`, {
-          description: errors.join('\n'),
-        })
-      }
-      
-      if (parsedDevices.length > 0) {
-        let successCount = 0
-        for (const device of parsedDevices) {
-          addDevice({
-            ...device,
-            position: devices.length + successCount + 1,
-          })
-          successCount++
-        }
-        toast.success(`成功导入 ${successCount} 台设备`)
-      } else if (errors.length === 0) {
-        toast.info('没有可导入的数据')
-      }
-    }
-    reader.readAsText(file)
+  const handleImportDevices = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('========== handleImportDevices 开始 ==========')
+    console.log('event:', event)
+    console.log('event.target:', event.target)
+    console.log('event.target.files:', event.target.files)
     
-    // Reset input
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
+    const file = event.target.files?.[0]
+    if (!file) {
+      console.log('没有选择文件')
+      console.log('========== handleImportDevices 结束 ==========')
+      return
     }
+
+    console.log('选择的文件:', file.name, file.type, file.size)
+    
+    if (!file.name.endsWith('.csv')) {
+      toast.error('请选择 CSV 格式的文件')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      console.log('========== handleImportDevices 结束 ==========')
+      return
+    }
+
+    console.log('开始读取文件...')
+    const reader = new FileReader()
+    
+    reader.onerror = () => {
+      console.error('文件读取失败')
+      toast.error('文件读取失败，请重试')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+    }
+    
+    reader.onload = async (e) => {
+      try {
+        console.log('文件读取成功')
+        const arrayBuffer = e.target?.result as ArrayBuffer
+        
+        let content = ''
+        const encodings = ['GBK', 'GB2312', 'UTF-8']
+        for (const encoding of encodings) {
+          try {
+            const decoder = new TextDecoder(encoding)
+            content = decoder.decode(arrayBuffer)
+            console.log(`尝试编码 ${encoding}:`, content.substring(0, 50))
+            if (content.includes('设备名称') || content.includes('站点名称')) {
+              console.log(`使用编码 ${encoding} 成功解码`)
+              break
+            }
+          } catch {
+            continue
+          }
+        }
+        
+        console.log('文件内容长度:', content?.length)
+        console.log('文件内容预览:', content?.substring(0, 300))
+        
+        if (!content || content.trim().length === 0) {
+          toast.error('文件内容为空')
+          return
+        }
+        
+        const { devices: parsedDevices, errors } = parseDevicesCSV(content, deviceTypes, stations, counters)
+        console.log('解析结果:', parsedDevices.length, '设备', errors.length, '错误')
+        console.log('解析的设备:', parsedDevices)
+        
+        if (errors.length > 0) {
+          console.log('解析错误:', errors)
+          toast.warning('导入警告', {
+            description: errors.join('\n'),
+          })
+        }
+        
+        if (parsedDevices.length > 0) {
+          console.log('准备导入设备...')
+          toast.info('正在导入设备，请稍候...')
+          let successCount = 0
+          let skipCount = 0
+          let errorCount = 0
+          for (const device of parsedDevices) {
+            if (devices.some(d => d.serialNumber === device.serialNumber)) {
+              console.log(`设备 ${device.name} 序列号已存在，跳过`)
+              skipCount++
+              continue
+            }
+            try {
+              console.log('添加设备:', device.name)
+              await addDevice({
+                ...device,
+                position: devices.length + successCount + 1,
+              })
+              successCount++
+              console.log('设备添加成功:', device.name)
+            } catch (err) {
+              console.error('添加设备失败:', err)
+              if (err instanceof Error && err.message.includes('序列号已存在')) {
+                skipCount++
+              } else {
+                errorCount++
+              }
+            }
+          }
+          
+          let message = ''
+          if (successCount > 0) message += `成功导入 ${successCount} 台设备`
+          if (skipCount > 0) message += message ? `，${skipCount} 台已存在跳过` : `${skipCount} 台设备已存在`
+          if (errorCount > 0) message += message ? `，${errorCount} 台导入失败` : `${errorCount} 台设备导入失败`
+          
+          if (successCount > 0) {
+            toast.success(message || '导入完成')
+          } else if (skipCount > 0) {
+            toast.info(message)
+          } else if (errorCount > 0) {
+            toast.error(message)
+          } else {
+            toast.info('没有可导入的数据')
+          }
+        } else if (errors.length === 0) {
+          toast.info('CSV 文件中没有有效的设备数据')
+        }
+      } catch (err) {
+        console.error('导入处理失败:', err)
+        toast.error(err instanceof Error ? err.message : '导入处理失败')
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
+        console.log('========== handleImportDevices 结束 ==========')
+      }
+    }
+    
+    reader.readAsArrayBuffer(file)
+    console.log('已调用 readAsArrayBuffer')
   }, [deviceTypes, stations, counters, devices, addDevice])
 
   if (!isInitialized) {
@@ -271,6 +443,21 @@ export default function DevicesPage() {
 
   if (!currentUser) {
     return null
+  }
+
+  const handleImportClick = () => {
+    console.log('导入按钮点击了')
+    console.log('fileInputRef.current:', fileInputRef.current)
+    // 使用延时确保 ref 已经正确关联
+    setTimeout(() => {
+      console.log('setTimeout 回调执行')
+      if (fileInputRef.current) {
+        console.log('触发文件选择对话框')
+        fileInputRef.current.click()
+      } else {
+        console.error('fileInputRef.current 为空，无法触发文件选择')
+      }
+    }, 50)
   }
 
   return (
@@ -293,11 +480,27 @@ export default function DevicesPage() {
                 <FileDown className="h-4 w-4 mr-2" />
                 模板
               </Button>
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={(e) => {
+                  console.log('导入 Button onClick 触发')
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleImportClick()
+                }}
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 导入
               </Button>
-              <Button variant="outline" size="sm" onClick={() => exportDevicesCSV(devices, deviceTypes, stations, counters)}>
+              <Button variant="outline" size="sm" onClick={() => {
+                const success = exportDevicesCSV(devices, deviceTypes, stations, counters)
+                if (success) {
+                  toast.success('设备列表已导出')
+                } else {
+                  toast.error('导出失败，请重试')
+                }
+              }}>
                 <Download className="h-4 w-4 mr-2" />
                 导出
               </Button>
@@ -428,7 +631,7 @@ export default function DevicesPage() {
                         </p>
                       )}
                     </div>
-                    {selectedType?.customAttributes.map(attr => (
+                    {Array.isArray(selectedType?.customAttributes) && selectedType.customAttributes.map(attr => (
                       <div key={attr.id} className="grid gap-2">
                         <Label>
                           {attr.name}
@@ -618,19 +821,19 @@ export default function DevicesPage() {
                                       <Pencil className="h-4 w-4 mr-2" />
                                       编辑
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(device.id, 'active')}>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(device.id, 'active', device.name)}>
                                       <div className="w-2 h-2 rounded-full bg-emerald-500 mr-2" />
                                       设为使用中
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(device.id, 'standby')}>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(device.id, 'standby', device.name)}>
                                       <div className="w-2 h-2 rounded-full bg-sky-500 mr-2" />
                                       设为备机
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(device.id, 'damaged')}>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(device.id, 'damaged', device.name)}>
                                       <div className="w-2 h-2 rounded-full bg-amber-500 mr-2" />
                                       标记损坏
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleStatusChange(device.id, 'repair')}>
+                                    <DropdownMenuItem onClick={() => handleStatusChange(device.id, 'repair', device.name)}>
                                       <div className="w-2 h-2 rounded-full bg-rose-500 mr-2" />
                                       送修
                                     </DropdownMenuItem>
@@ -665,9 +868,46 @@ export default function DevicesPage() {
         title={confirmDialog.title}
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
-        confirmText="确认删除"
-        variant="destructive"
+        confirmText="确认"
+        variant={confirmDialog.variant || 'destructive'}
       />
+
+      {/* 状态变更对话框（需填写原因） */}
+      <Dialog open={statusChangeDialog.open} onOpenChange={(open) => setStatusChangeDialog(prev => ({ ...prev, open }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {statusChangeDialog.targetStatus === 'damaged' ? '标记设备损坏' : '设备送修'}
+            </DialogTitle>
+            <DialogDescription>
+              请填写「{statusChangeDialog.deviceName}」状态变更的原因
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>变更原因 <span className="text-destructive">*</span></Label>
+              <Textarea
+                value={statusChangeDialog.reason}
+                onChange={(e) => setStatusChangeDialog(prev => ({ ...prev, reason: e.target.value }))}
+                placeholder={statusChangeDialog.targetStatus === 'damaged' ? '请描述设备损坏情况...' : '请描述送修原因...'}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusChangeDialog(prev => ({ ...prev, open: false }))}>
+              取消
+            </Button>
+            <Button
+              variant={statusChangeDialog.targetStatus === 'damaged' ? 'default' : 'destructive'}
+              onClick={handleStatusChangeConfirm}
+              disabled={!statusChangeDialog.reason.trim()}
+            >
+              确认
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

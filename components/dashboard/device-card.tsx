@@ -52,9 +52,7 @@ export function DeviceCard({ device, onStatusChange, onPaperChange, compact = fa
   const { deviceTypes } = useStoreContext()
   const deviceType = deviceTypes.find(t => t.id === device.typeId)
   const iconName = deviceType?.icon || 'Monitor'
-  // 判断是否是自定义图标（base64 图片）
-  const isCustomImage = iconName.startsWith('data:image/')
-  // 从 lucide-react 中获取图标组件
+  const isCustomImage = typeof iconName === 'string' && iconName.startsWith('data:image/')
   const LucideIcon = !isCustomImage ? (LucideIcons as any)[iconName] || Monitor : null
   const status = statusColors[device.status]
 

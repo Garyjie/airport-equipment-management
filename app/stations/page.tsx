@@ -114,49 +114,139 @@ export default function StationsPage() {
     title: string
     description?: string
     onConfirm: () => void
+    variant?: 'default' | 'destructive' | 'warning'
   }>({
     open: false,
     title: '',
     onConfirm: () => {},
   })
+  const [statusChangeDialog, setStatusChangeDialog] = useState({
+    open: false,
+    deviceId: '',
+    deviceName: '',
+    targetStatus: '' as DeviceStatus,
+    reason: '',
+  })
 
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const handleImportStations = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportStations = useCallback(async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
-    if (!file) return
+    if (!file) {
+      console.log('没有选择文件')
+      return
+    }
+
+    console.log('选择的文件:', file.name, file.type, file.size)
+    
+    if (!file.name.endsWith('.csv')) {
+      toast.error('请选择 CSV 格式的文件')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
+      }
+      return
+    }
 
     const reader = new FileReader()
-    reader.onload = (e) => {
-      const content = e.target?.result as string
-      const { stations: parsedStations, errors } = parseStationsCSV(content)
-      
-      if (errors.length > 0) {
-        toast.warning('导入警告', {
-          description: errors.join('\n'),
-        })
+    
+    reader.onerror = () => {
+      console.error('文件读取失败')
+      toast.error('文件读取失败，请重试')
+      if (fileInputRef.current) {
+        fileInputRef.current.value = ''
       }
-      
-      if (parsedStations.length > 0) {
-        let successCount = 0
-        for (const station of parsedStations) {
-          // 检查站点名称是否已存在
-          if (stations.some(s => s.name === station.name || s.code === station.code)) {
+    }
+    
+    reader.onload = async (e) => {
+      try {
+        console.log('文件读取成功')
+        const arrayBuffer = e.target?.result as ArrayBuffer
+        
+        let content = ''
+        const encodings = ['GBK', 'GB2312', 'UTF-8']
+        for (const encoding of encodings) {
+          try {
+            const decoder = new TextDecoder(encoding)
+            content = decoder.decode(arrayBuffer)
+            console.log(`尝试编码 ${encoding}:`, content.substring(0, 50))
+            if (content.includes('站点名称')) {
+              console.log(`使用编码 ${encoding} 成功解码`)
+              break
+            }
+          } catch {
             continue
           }
-          addStation(station)
-          successCount++
         }
-        toast.success(`成功导入 ${successCount} 个站点`)
-      } else if (errors.length === 0) {
-        toast.info('没有可导入的数据')
+        
+        console.log('文件内容长度:', content?.length)
+        
+        if (!content || content.trim().length === 0) {
+          toast.error('文件内容为空')
+          return
+        }
+        
+        const { stations: parsedStations, errors } = parseStationsCSV(content)
+        console.log('解析结果:', parsedStations.length, '站点', errors.length, '错误')
+        console.log('当前系统已有站点:', stations.map(s => `${s.name}(${s.code})`))
+        
+        if (errors.length > 0) {
+          toast.warning('导入警告', {
+            description: errors.join('\n'),
+          })
+        }
+        
+        if (parsedStations.length > 0) {
+          console.log('进入导入循环')
+          toast.info('正在导入站点，请稍候...')
+          let successCount = 0
+          let skipCount = 0
+          let errorCount = 0
+          for (const station of parsedStations) {
+            console.log(`处理站点: ${station.name}(${station.code})`)
+            if (stations.some(s => s.name === station.name || s.code === station.code)) {
+              console.log(`站点 ${station.name}(${station.code}) 已存在，跳过`)
+              skipCount++
+              continue
+            }
+            try {
+              console.log(`添加站点: ${station.name}(${station.code})`)
+              await addStation(station)
+              console.log(`站点添加成功: ${station.name}(${station.code})`)
+              successCount++
+            } catch (err) {
+              console.error('添加站点失败:', err)
+              errorCount++
+            }
+          }
+          
+          let message = ''
+          if (successCount > 0) message += `成功导入 ${successCount} 个站点`
+          if (skipCount > 0) message += message ? `，${skipCount} 个已存在跳过` : `${skipCount} 个站点已存在`
+          if (errorCount > 0) message += message ? `，${errorCount} 个导入失败` : `${errorCount} 个站点导入失败`
+          
+          if (successCount > 0) {
+            toast.success(message || '导入完成')
+          } else if (skipCount > 0) {
+            toast.info(message)
+          } else if (errorCount > 0) {
+            toast.error(message)
+          } else {
+            toast.info('没有可导入的数据')
+          }
+        } else if (errors.length === 0) {
+          toast.info('CSV 文件中没有有效的站点数据')
+        }
+      } catch (err) {
+        console.error('导入处理失败:', err)
+        toast.error(err instanceof Error ? err.message : '导入处理失败')
+      } finally {
+        if (fileInputRef.current) {
+          fileInputRef.current.value = ''
+        }
       }
     }
-    reader.readAsText(file)
     
-    if (fileInputRef.current) {
-      fileInputRef.current.value = ''
-    }
+    reader.readAsArrayBuffer(file)
   }, [stations, addStation])
 
   useEffect(() => {
@@ -186,8 +276,7 @@ export default function StationsPage() {
     setStationDialogOpen(true)
   }
 
-  const handleSubmitStation = () => {
-    // 表单验证
+  const handleSubmitStation = async () => {
     if (!stationForm.name.trim()) {
       toast.error('请输入站点名称')
       return
@@ -197,17 +286,21 @@ export default function StationsPage() {
       return
     }
     
-    if (editingStation) {
-      updateStation(editingStation.id, stationForm)
-      toast.success('站点信息已更新')
-    } else {
-      addStation({
-        ...stationForm,
-        position: { x: stations.length % 3, y: Math.floor(stations.length / 3) },
-      })
-      toast.success('站点已添加')
+    try {
+      if (editingStation) {
+        await updateStation(editingStation.id, stationForm)
+        toast.success('站点信息已更新')
+      } else {
+        await addStation({
+          ...stationForm,
+          position: { x: stations.length % 3, y: Math.floor(stations.length / 3) },
+        })
+        toast.success('站点已添加')
+      }
+      setStationDialogOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
     }
-    setStationDialogOpen(false)
   }
 
   const handleDeleteStation = (id: string) => {
@@ -220,11 +313,16 @@ export default function StationsPage() {
       open: true,
       title: '确认删除站点',
       description: '确定要删除这个站点吗？此操作无法撤销。',
-      onConfirm: () => {
-        deleteStation(id)
-        toast.success('站点已删除')
-        if (drillDownStation?.id === id) {
-          setDrillDownStation(null)
+      onConfirm: async () => {
+        try {
+          await deleteStation(id)
+          toast.success('站点已删除')
+          setConfirmDialog(prev => ({ ...prev, open: false }))
+          if (drillDownStation?.id === id) {
+            setDrillDownStation(null)
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : '删除失败')
         }
       },
     })
@@ -236,40 +334,67 @@ export default function StationsPage() {
     setCounterDialogOpen(true)
   }
 
-  const handleSubmitCounter = () => {
-    // 表单验证
+  const handleSubmitCounter = async () => {
     if (!counterForm.name.trim()) {
       toast.error('请输入柜台名称')
       return
     }
     
-    const stationCounters = counters.filter(c => c.stationId === selectedStationId)
+    const isBatch = counterForm.useBatch && (parseInt(counterForm.batchCount.toString()) || 1) > 1
     
-    if (counterForm.useBatch) {
-      // 批量添加柜台
+    if (isBatch) {
       const count = parseInt(counterForm.batchCount.toString()) || 1
       const startNum = parseInt(counterForm.startNumber.toString()) || 1
-      
-      for (let i = 0; i < count; i++) {
-        const currentNum = startNum + i
-        addCounter({
-          name: `${counterForm.name}${currentNum.toString().padStart(2, '0')}`,
-          stationId: selectedStationId,
-          position: stationCounters.length + 1 + i,
-        })
-      }
-      toast.success(`成功添加 ${count} 个柜台`)
-    } else {
-      // 单个添加柜台
-      addCounter({
-        name: counterForm.name,
-        stationId: selectedStationId,
-        position: stationCounters.length + 1,
+      setConfirmDialog({
+        open: true,
+        title: '确认批量添加柜台',
+        description: `确定要添加 ${count} 个柜台吗？\n名称将从 ${counterForm.name}${startNum.toString().padStart(2, '0')} 开始`,
+        variant: 'warning',
+        onConfirm: async () => {
+          try {
+            await doSubmitCounter()
+            setConfirmDialog(prev => ({ ...prev, open: false }))
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : '操作失败')
+          }
+        },
       })
-      toast.success('柜台已添加')
+    } else {
+      await doSubmitCounter()
     }
-    
-    setCounterDialogOpen(false)
+  }
+
+  const doSubmitCounter = async () => {
+    try {
+      const stationCounters = counters.filter(c => c.stationId === selectedStationId)
+      
+      if (counterForm.useBatch) {
+        const count = parseInt(counterForm.batchCount.toString()) || 1
+        const startNum = parseInt(counterForm.startNumber.toString()) || 1
+        
+        for (let i = 0; i < count; i++) {
+          const currentNum = startNum + i
+          await addCounter({
+            name: `${counterForm.name}${currentNum.toString().padStart(2, '0')}`,
+            stationId: selectedStationId,
+            position: stationCounters.length + 1 + i,
+          })
+        }
+        toast.success(`成功添加 ${count} 个柜台`)
+      } else {
+        await addCounter({
+          name: counterForm.name,
+          stationId: selectedStationId,
+          position: stationCounters.length + 1,
+        })
+        toast.success('柜台已添加')
+      }
+      
+      setCounterDialogOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
+      throw err
+    }
   }
 
   const handleDeleteCounter = (counterId: string) => {
@@ -282,11 +407,16 @@ export default function StationsPage() {
       open: true,
       title: '确认删除柜台',
       description: '确定要删除这个柜台吗？此操作无法撤销。',
-      onConfirm: () => {
-        deleteCounter(counterId)
-        toast.success('柜台已删除')
-        if (drillDownCounter?.id === counterId) {
-          setDrillDownCounter(null)
+      onConfirm: async () => {
+        try {
+          await deleteCounter(counterId)
+          toast.success('柜台已删除')
+          setConfirmDialog(prev => ({ ...prev, open: false }))
+          if (drillDownCounter?.id === counterId) {
+            setDrillDownCounter(null)
+          }
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : '删除失败')
         }
       },
     })
@@ -299,20 +429,23 @@ export default function StationsPage() {
     setDeviceDialogOpen(true)
   }
 
-  const handleAddDeviceToCounter = () => {
+  const handleAddDeviceToCounter = async () => {
     if (!deviceForm.deviceId || !selectedCounterId || !currentUser) return
     
     const counter = counters.find(c => c.id === selectedCounterId)
     if (!counter) return
 
-    updateDevice(deviceForm.deviceId, {
-      stationId: counter.stationId,
-      counterId: selectedCounterId,
-      status: 'active',
-    })
-    changeDeviceStatus(deviceForm.deviceId, 'active', '添加到柜台')
-    toast.success('设备已添加到柜台')
-    setDeviceDialogOpen(false)
+    try {
+      await updateDevice(deviceForm.deviceId, {
+        stationId: counter.stationId,
+        counterId: selectedCounterId,
+        status: 'active',
+      })
+      toast.success('设备已添加到柜台')
+      setDeviceDialogOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
+    }
   }
 
   const handleRemoveDeviceFromCounter = (deviceId: string) => {
@@ -320,19 +453,82 @@ export default function StationsPage() {
       open: true,
       title: '确认移除设备',
       description: '确定要将此设备从柜台移除吗？设备将被移到备机区。',
-      onConfirm: () => {
-        updateDevice(deviceId, { counterId: undefined })
-        changeDeviceStatus(deviceId, 'standby', '从柜台移除到备机区')
-        toast.success('设备已移到备机区')
+      onConfirm: async () => {
+        try {
+          await updateDevice(deviceId, { counterId: undefined })
+          await changeDeviceStatus(deviceId, 'standby', '从柜台移除到备机区')
+          toast.success('设备已移到备机区')
+          setConfirmDialog(prev => ({ ...prev, open: false }))
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : '操作失败')
+        }
       },
     })
   }
 
-  const handleDeviceStatusChange = (deviceId: string, status: DeviceStatus) => {
-    if (status !== 'active') {
-      updateDevice(deviceId, { counterId: undefined })
+  const handleDeviceStatusChange = (deviceId: string, status: DeviceStatus, deviceName: string) => {
+    const statusLabels: Record<DeviceStatus, string> = {
+      active: '使用中',
+      standby: '备机',
+      damaged: '损坏',
+      repair: '送修',
     }
-    changeDeviceStatus(deviceId, status, '手动状态变更')
+    const needReason = status === 'damaged' || status === 'repair'
+    
+    if (needReason) {
+      setStatusChangeDialog({
+        open: true,
+        deviceId,
+        deviceName,
+        targetStatus: status,
+        reason: '',
+      })
+    } else {
+      setConfirmDialog({
+        open: true,
+        title: `确认将设备设为${statusLabels[status]}`,
+        description: `确定要将「${deviceName}」的状态设置为${statusLabels[status]}吗？`,
+        variant: status === 'active' ? 'default' : 'warning',
+        onConfirm: async () => {
+          try {
+            if (status !== 'active') {
+              await updateDevice(deviceId, { counterId: undefined })
+            }
+            await changeDeviceStatus(deviceId, status, '手动状态变更')
+            toast.success(`设备状态已更新为${statusLabels[status]}`)
+            setConfirmDialog(prev => ({ ...prev, open: false }))
+          } catch (err) {
+            toast.error(err instanceof Error ? err.message : '操作失败')
+          }
+        },
+      })
+    }
+  }
+
+  const handleStatusChangeConfirm = async () => {
+    const statusLabels: Record<DeviceStatus, string> = {
+      active: '使用中',
+      standby: '备机',
+      damaged: '损坏',
+      repair: '送修',
+    }
+    const { deviceId, targetStatus, reason } = statusChangeDialog
+    if (targetStatus === 'damaged' || targetStatus === 'repair') {
+      if (!reason.trim()) {
+        toast.error('请填写变更原因')
+        return
+      }
+    }
+    try {
+      if (targetStatus !== 'active') {
+        await updateDevice(deviceId, { counterId: undefined })
+      }
+      await changeDeviceStatus(deviceId, targetStatus, reason || '手动状态变更')
+      toast.success(`设备状态已更新为${statusLabels[targetStatus]}`)
+      setStatusChangeDialog(prev => ({ ...prev, open: false }))
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
+    }
   }
 
   const getStationIcon = (type: StationType) => {
@@ -431,7 +627,7 @@ export default function StationsPage() {
                               <div className="flex gap-1">
                                 <Select
                                   value={device.status}
-                                  onValueChange={(value) => handleDeviceStatusChange(device.id, value as DeviceStatus)}
+                                  onValueChange={(value) => handleDeviceStatusChange(device.id, value as DeviceStatus, device.name)}
                                 >
                                   <SelectTrigger className="w-24 h-8 text-xs">
                                     <SelectValue />
@@ -524,7 +720,7 @@ export default function StationsPage() {
 
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-medium">柜台列表</h3>
-              {isAdmin && (drillDownStation.type === 'checkin' || drillDownStation.type === 'gate') && (
+              {isAdmin && (
                 <Button size="sm" onClick={() => handleOpenCounterDialog(drillDownStation.id)}>
                   <Plus className="h-4 w-4 mr-1" />
                   添加柜台
@@ -578,7 +774,7 @@ export default function StationsPage() {
                 <div className="text-center py-8 text-muted-foreground">
                   <Settings className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>暂无柜台</p>
-                  {isAdmin && (drillDownStation.type === 'checkin' || drillDownStation.type === 'gate') && (
+                  {isAdmin && (
                     <Button 
                       variant="outline" 
                       size="sm" 
@@ -595,6 +791,21 @@ export default function StationsPage() {
         </SheetContent>
       </Sheet>
     )
+  }
+
+  const handleImportClick = () => {
+    console.log('导入按钮点击了')
+    console.log('fileInputRef.current:', fileInputRef.current)
+    // 使用延时确保 ref 已经正确关联
+    setTimeout(() => {
+      console.log('setTimeout 回调执行')
+      if (fileInputRef.current) {
+        console.log('触发文件选择对话框')
+        fileInputRef.current.click()
+      } else {
+        console.error('fileInputRef.current 为空，无法触发文件选择')
+      }
+    }, 0)
   }
 
   return (
@@ -617,7 +828,16 @@ export default function StationsPage() {
                 <FileDown className="h-4 w-4 mr-2" />
                 模板
               </Button>
-              <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={(e) => {
+                  console.log('导入 Button onClick 触发')
+                  e.preventDefault()
+                  e.stopPropagation()
+                  handleImportClick()
+                }}
+              >
                 <Upload className="h-4 w-4 mr-2" />
                 导入
               </Button>
@@ -915,8 +1135,45 @@ export default function StationsPage() {
         description={confirmDialog.description}
         onConfirm={confirmDialog.onConfirm}
         confirmText="确认"
-        variant="destructive"
+        variant={confirmDialog.variant || 'destructive'}
       />
+
+      {/* 状态变更对话框（需填写原因） */}
+      <Dialog open={statusChangeDialog.open} onOpenChange={(open) => setStatusChangeDialog(prev => ({ ...prev, open }))}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {statusChangeDialog.targetStatus === 'damaged' ? '标记设备损坏' : '设备送修'}
+            </DialogTitle>
+            <DialogDescription>
+              请填写「{statusChangeDialog.deviceName}」状态变更的原因
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label>变更原因 <span className="text-destructive">*</span></Label>
+              <Textarea
+                value={statusChangeDialog.reason}
+                onChange={(e) => setStatusChangeDialog(prev => ({ ...prev, reason: e.target.value }))}
+                placeholder={statusChangeDialog.targetStatus === 'damaged' ? '请描述设备损坏情况...' : '请描述送修原因...'}
+                rows={3}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setStatusChangeDialog(prev => ({ ...prev, open: false }))}>
+              取消
+            </Button>
+            <Button
+              variant={statusChangeDialog.targetStatus === 'damaged' ? 'default' : 'destructive'}
+              onClick={handleStatusChangeConfirm}
+              disabled={!statusChangeDialog.reason.trim()}
+            >
+              确认
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

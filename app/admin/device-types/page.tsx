@@ -179,6 +179,7 @@ export default function DeviceTypesPage() {
   const [editingType, setEditingType] = useState<DeviceType | null>(null)
   const [formData, setFormData] = useState({
     name: '',
+    category: '其他',
     icon: 'Monitor',
     description: '',
     customAttributes: [] as CustomAttribute[],
@@ -262,6 +263,7 @@ export default function DeviceTypesPage() {
       setEditingType(type)
       setFormData({
         name: type.name,
+        category: (type as any).category || '其他',
         icon: type.icon,
         description: type.description,
         customAttributes: type.customAttributes,
@@ -270,6 +272,7 @@ export default function DeviceTypesPage() {
       setEditingType(null)
       setFormData({
         name: '',
+        category: '其他',
         icon: 'Monitor',
         description: '',
         customAttributes: [],
@@ -302,21 +305,24 @@ export default function DeviceTypesPage() {
     }))
   }
 
-  const handleSubmit = () => {
-    // 表单验证
+  const handleSubmit = async () => {
     if (!formData.name.trim()) {
       toast.error('请输入设备类型名称')
       return
     }
     
-    if (editingType) {
-      updateDeviceType(editingType.id, formData)
-      toast.success('设备类型已更新')
-    } else {
-      addDeviceType(formData)
-      toast.success('设备类型已添加')
+    try {
+      if (editingType) {
+        await updateDeviceType(editingType.id, formData)
+        toast.success('设备类型已更新')
+      } else {
+        await addDeviceType(formData)
+        toast.success('设备类型已添加')
+      }
+      setDialogOpen(false)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
     }
-    setDialogOpen(false)
   }
 
   const handleDelete = (id: string) => {
@@ -329,9 +335,14 @@ export default function DeviceTypesPage() {
       open: true,
       title: '确认删除设备类型',
       description: '确定要删除这个设备类型吗？此操作无法撤销。',
-      onConfirm: () => {
-        deleteDeviceType(id)
-        toast.success('设备类型已删除')
+      onConfirm: async () => {
+        try {
+          await deleteDeviceType(id)
+          toast.success('设备类型已删除')
+          setConfirmDialog(prev => ({ ...prev, open: false }))
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : '删除失败')
+        }
       },
     })
   }
@@ -373,7 +384,7 @@ export default function DeviceTypesPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-3 gap-4">
                     <div className="grid gap-2">
                       <Label>类型名称</Label>
                       <Input
@@ -381,6 +392,25 @@ export default function DeviceTypesPage() {
                         onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                         placeholder="例如: CUSS 自助机"
                       />
+                    </div>
+                    <div className="grid gap-2">
+                      <Label>分类</Label>
+                      <Select
+                        value={formData.category}
+                        onValueChange={(value) => setFormData(prev => ({ ...prev, category: value }))}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="电脑">电脑</SelectItem>
+                          <SelectItem value="打印机">打印机</SelectItem>
+                          <SelectItem value="自助设备">自助设备</SelectItem>
+                          <SelectItem value="扫描设备">扫描设备</SelectItem>
+                          <SelectItem value="称重设备">称重设备</SelectItem>
+                          <SelectItem value="其他">其他</SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                     <div className="grid gap-2">
                       <Label>图标</Label>
@@ -393,7 +423,8 @@ export default function DeviceTypesPage() {
                             className="w-full justify-between"
                           >
                             {(() => {
-                              const selected = iconOptions.find(opt => opt.value === formData.icon)
+                              const icon = formData.icon || ''
+                              const selected = iconOptions.find(opt => opt.value === icon)
                               if (selected) {
                                 return (
                                   <div className="flex items-center gap-2">
@@ -403,13 +434,13 @@ export default function DeviceTypesPage() {
                                 )
                               }
                               // 检查是否是自定义图标（base64 图片或 emoji）
-                              if (formData.icon.startsWith('data:image/') || formData.icon.length <= 4) {
+                              if (icon.startsWith('data:image/') || icon.length <= 4) {
                                 return (
                                   <div className="flex items-center gap-2">
-                                    {formData.icon.startsWith('data:image/') ? (
-                                      <img src={formData.icon} alt="自定义图标" className="h-5 w-5 object-contain" />
+                                    {icon.startsWith('data:image/') ? (
+                                      <img src={icon} alt="自定义图标" className="h-5 w-5 object-contain" />
                                     ) : (
-                                      <span className="text-lg">{formData.icon}</span>
+                                      <span className="text-lg">{icon}</span>
                                     )}
                                     <span>自定义</span>
                                   </div>
@@ -599,9 +630,10 @@ export default function DeviceTypesPage() {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {deviceTypes.map(type => {
               const typeDevices = devices.filter(d => d.typeId === type.id)
-              const isCustomImage = type.icon.startsWith('data:image/')
+              const icon = type.icon || ''
+              const isCustomImage = icon.startsWith('data:image/')
               const IconComponent = !isCustomImage 
-                ? iconOptions.find(o => o.value === type.icon)?.Icon || Monitor
+                ? iconOptions.find(o => o.value === icon)?.Icon || Monitor
                 : null
 
               return (
@@ -611,7 +643,7 @@ export default function DeviceTypesPage() {
                       <div className="flex items-center gap-3">
                         <div className="rounded-lg bg-primary/10 p-2">
                           {isCustomImage ? (
-                            <img src={type.icon} alt={type.name} className="h-5 w-5 object-contain" />
+                            <img src={icon} alt={type.name} className="h-5 w-5 object-contain" />
                           ) : (
                             IconComponent && <IconComponent className="h-5 w-5 text-primary" />
                           )}

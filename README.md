@@ -1,8 +1,8 @@
 # 机场设备管理系统
 
-专为机场设计的设备状态监控和更换管理平台，支持实时监控、灵活配置、数据导出等功能。
+专为机场设计的设备状态监控和更换管理平台，支持实时监控、灵活配置、数据导出等功能。采用前后端分离架构，后端使用 Express + Prisma ORM，支持 SQLite、PostgreSQL、MySQL 等多种数据库。
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Node](https://img.shields.io/badge/node-18.17.0+-green)
 
@@ -15,12 +15,14 @@
 - **设备替换** - 点击式便捷操作，从备机库快速搜索和安装设备
 - **更换记录** - 完整的设备移动、状态变更历史追溯
 - **换纸记录** - CUSS 自助机专用耗材更换记录管理
+- **耗材管理** - 通用耗材更换记录管理
 
 ### 高级功能
 - 🌓 **深浅色主题** - 支持黑白主题切换
-- 📤 **数据导入导出** - CSV 格式支持批量操作
+- 📤 **数据导入导出** - CSV 格式支持批量操作，自动识别 GBK/UTF-8 编码
 - 👥 **用户管理** - 管理员和普通用户角色分离
-- 🔒 **权限控制** - 基于角色的访问控制
+- 🔒 **权限控制** - 基于角色的访问控制（JWT + bcrypt）
+- 📝 **审计日志** - 所有操作记录，支持安全审计
 - 📱 **响应式设计** - 支持桌面和平板展示
 
 ### 设备状态管理
@@ -31,241 +33,258 @@
 
 ## 🚀 快速开始
 
-### 最简单的方式（5分钟）
+### 环境要求
+- **Node.js**: 18.17.0+
+- **npm**: 9.0.0+ 或 pnpm
+- **数据库**: SQLite（默认）/ PostgreSQL 15+ / MySQL 8.0+
+
+### 安装步骤
 
 ```bash
-# 1. 下载并进入项目目录
+# 1. 克隆项目
+git clone <repo-url>
 cd airport-equipment-management
 
 # 2. 安装依赖
 npm install
 
-# 3. 启动开发服务器
-npm run dev
+# 3. 配置环境变量
+cp .env.example .env
+# 编辑 .env 文件，配置数据库连接和 JWT 密钥
 
-# 4. 打开浏览器访问
-# http://localhost:3000
+# 4. 初始化数据库
+npm run prisma:generate
+npm run prisma:migrate
+npm run prisma:seed
+
+# 5. 启动后端服务器
+npm run server
+# 服务器运行在 http://localhost:5000
+
+# 6. 启动前端开发服务器（新开一个终端）
+npm run dev
+# 前端运行在 http://localhost:3000
 ```
 
-**默认登录账号（localStorage 模式）：**
-- 用户名：admin
-- 密码：admin
+### 默认登录账号
+
+| 用户名 | 密码 | 角色 |
+|--------|------|------|
+| admin | admin123 | 管理员 |
+| operator | operator123 | 普通用户 |
 
 **更详细的指南请查看：[快速开始指南](docs/QUICK_START.md)**
 
-## 📖 文档
+## 🏗️ 技术架构
 
-| 文档 | 描述 |
-|------|------|
-| [快速开始指南](docs/QUICK_START.md) | 5分钟快速上手，最简单的开始方式 |
-| [详细部署指南](docs/DEPLOYMENT_GUIDE.md) | 完整的部署步骤，包括本地开发、生产部署等 |
-| [生产环境配置](docs/PRODUCTION_SETUP.md) | 数据库配置、密码加密、安全检查清单 |
-| [PostgreSQL 数据库脚本](docs/schema_postgresql.sql) | PostgreSQL 数据库表结构 |
-| [MySQL 数据库脚本](docs/schema_mysql.sql) | MySQL 数据库表结构 |
-| [初始数据脚本](docs/initial_data.sql) | 示例数据（用户、站点、设备等） |
+### 技术栈
 
-## 🏗️ 项目结构
+| 层级 | 技术 | 说明 |
+|------|------|------|
+| **前端** | Next.js 16 + React 19 | SSR/SSG 框架 |
+| **UI** | shadcn/ui + Tailwind CSS v4 | 组件库和样式 |
+| **状态管理** | React Context + Hooks | 全局状态 |
+| **后端** | Express 5.x | API 服务器 |
+| **ORM** | Prisma 5.x | 数据库 ORM |
+| **数据库** | SQLite / PostgreSQL / MySQL | 数据存储 |
+| **认证** | JWT + bcrypt | 身份认证 |
+| **类型检查** | TypeScript | 类型安全 |
+
+### 项目结构
 
 ```
 airport-equipment-management/
-├── app/                     # Next.js 应用
+├── app/                     # Next.js 前端应用
+│   ├── layout.tsx           # 全局布局
 │   ├── page.tsx             # 登录页
 │   ├── dashboard/           # 仪表盘
 │   ├── devices/             # 设备管理
 │   ├── stations/            # 站点管理
-│   ├── admin/               # 管理功能
-│   │   ├── users/           # 用户管理
-│   │   └── device-types/    # 设备类型管理
 │   ├── change-records/      # 更换记录
-│   └── paper-records/       # 换纸记录
+│   ├── paper-records/       # 换纸记录
+│   └── admin/               # 管理功能
+│       ├── users/           # 用户管理
+│       └── device-types/    # 设备类型管理
 ├── components/              # React 组件
+│   ├── auth/                # 认证组件
 │   ├── dashboard/           # 仪表盘组件
 │   ├── layout/              # 布局组件
-│   └── ui/                  # UI 组件
+│   └── ui/                  # UI 组件库
 ├── lib/                     # 工具和类型
+│   ├── api.ts               # API 请求封装
+│   ├── store.ts             # 全局状态管理
+│   ├── store-context.tsx    # Context Provider
 │   ├── types.ts             # TypeScript 类型定义
-│   ├── store.ts             # 数据存储管理
 │   ├── export.ts            # 导入导出功能
-│   └── store-context.tsx    # 数据上下文
-├── hooks/                   # 自定义 Hook
-├── docs/                    # 完整文档和 SQL 脚本
-│   ├── QUICK_START.md       # 快速开始指南
+│   └── utils.ts             # 工具函数
+├── server/                  # Express 后端
+│   ├── index.ts             # 服务器入口
+│   ├── prisma.ts            # Prisma 客户端
+│   ├── seed.ts              # 初始数据脚本
+│   ├── middleware/
+│   │   └── auth.ts          # JWT 认证中间件
+│   └── routes/              # API 路由
+│       ├── auth.ts          # 认证接口
+│       ├── users.ts         # 用户接口
+│       ├── deviceTypes.ts   # 设备类型接口
+│       ├── stations.ts      # 站点接口
+│       ├── counters.ts      # 柜台接口
+│       ├── devices.ts       # 设备接口
+│       ├── changeRecords.ts # 变更记录接口
+│       ├── paperRecords.ts  # 换纸记录接口
+│       └── consumableRecords.ts # 耗材记录接口
+├── prisma/                  # Prisma ORM
+│   ├── schema.prisma        # 数据库模型定义
+│   └── migrations/          # 数据库迁移
+├── docs/                    # 项目文档
+│   ├── sql/                 # SQL 脚本
+│   │   ├── schema_postgresql.sql
+│   │   ├── schema_mysql.sql
+│   │   └── initial_data.sql
+│   ├── QUICK_START.md       # 快速开始
 │   ├── DEPLOYMENT_GUIDE.md  # 部署指南
 │   ├── PRODUCTION_SETUP.md  # 生产环境配置
-│   ├── schema_postgresql.sql # PostgreSQL 数据库脚本
-│   ├── schema_mysql.sql     # MySQL 数据库脚本
-│   └── initial_data.sql     # 初始数据脚本
+│   ├── 项目详解.md          # 项目详细文档
+│   └── 新手入门详解.md      # 新手入门教程
 ├── public/                  # 静态资源
 ├── package.json             # 项目配置
-└── next.config.js           # Next.js 配置
+└── .env.example             # 环境变量示例
 ```
 
-## 🗄️ 数据库支持
+## 🗄️ 数据库
 
-系统支持以下数据库，可根据需求选择：
+### 支持的数据库
 
 | 数据库 | 推荐 | 适用场景 |
-|--------|------|--------|
+|--------|------|----------|
+| **SQLite** | - | 开发测试、小型机场 |
 | **PostgreSQL** | ✅ 推荐 | 生产环境、大型机场 |
 | **MySQL** | ✅ 推荐 | 生产环境、中小型机场 |
-| **SQLite** | - | 测试环境、小型机场 |
-| **localStorage**（当前） | - | 开发测试阶段 |
-
-**迁移到数据库？** 查看[生产环境配置](docs/PRODUCTION_SETUP.md)
 
 ### 数据库表结构
 
-| 表名 | 描述 |
-|------|------|
-| users | 用户信息 |
-| stations | 站点信息（值机岛、登机口、自助服务区） |
-| counters | 柜台信息 |
-| device_types | 设备类型定义 |
-| devices | 设备信息 |
-| device_change_records | 设备更换记录 |
-| paper_change_records | 换纸记录 |
-| audit_logs | 审计日志 |
+| 表名 | 说明 | 记录数（示例） |
+|------|------|--------------|
+| `users` | 用户信息 | 2 |
+| `stations` | 站点信息（值机岛、登机口、自助服务区） | 8 |
+| `counters` | 柜台信息 | 17 |
+| `device_types` | 设备类型定义 | 8 |
+| `devices` | 设备信息 | 30 |
+| `device_change_records` | 设备更换记录 | 3 |
+| `paper_change_records` | 换纸记录 | - |
+| `consumable_records` | 耗材更换记录 | - |
+| `audit_logs` | 系统审计日志 | - |
 
-## 🔐 安全性
+**详细数据库说明请查看：[生产环境配置](docs/PRODUCTION_SETUP.md)**
 
-- ✅ 密码使用 bcrypt 加密存储
-- ✅ 基于角色的访问控制 (RBAC)
+## 🔐 安全特性
+
+- ✅ 密码使用 bcrypt 加密存储（10轮加盐）
+- ✅ JWT Token 身份认证
+- ✅ 基于角色的访问控制（RBAC）
 - ✅ 审计日志记录所有操作
-- ✅ 支持 HTTPS/TLS 加密传输
-- ✅ SQL 注入防护
-- ✅ XSS 和 CSRF 防护
+- ✅ SQL 注入防护（Prisma 参数化查询）
+- ✅ XSS 防护（React 自动转义）
+- ✅ 软删除机制（数据可恢复）
+- ✅ 操作原因记录（状态变更需填写原因）
 
-## 🎯 主要模块说明
+## 📖 文档列表
 
-### 仪表盘（Dashboard）
-- 实时设备状态统计
-- 站点设备分布显示
-- 统计卡片支持下钻查看详情
-- 快速设备替换操作
+| 文档 | 说明 | 适合人群 |
+|------|------|----------|
+| [快速开始指南](docs/QUICK_START.md) | 5分钟快速上手 | 初学者 |
+| [详细部署指南](docs/DEPLOYMENT_GUIDE.md) | 完整的部署步骤 | 运维人员 |
+| [生产环境配置](docs/PRODUCTION_SETUP.md) | 数据库配置、安全检查 | 运维/开发 |
+| [项目详解](docs/项目详解.md) | 完整的项目技术文档 | 开发者 |
+| [新手入门详解](docs/新手入门详解.md) | 通俗讲解，从零开始 | 初学者 |
+| [PostgreSQL 脚本](docs/sql/schema_postgresql.sql) | PostgreSQL 数据库表结构 | DBA/开发 |
+| [MySQL 脚本](docs/sql/schema_mysql.sql) | MySQL 数据库表结构 | DBA/开发 |
+| [初始数据脚本](docs/sql/initial_data.sql) | 示例数据导入 | 开发者 |
 
-### 设备管理
-- 设备列表增删改查
-- 批量导入导出（CSV）
-- 设备类型自定义
-- 自定义属性管理
-- 按站点分组显示（备机区、损坏区、送修区）
+## 🎯 API 接口概览
 
-### 站点管理
-- 站点增删改查
-- 柜台管理（值机岛和登机口）
-- 支持逐级下钻到设备
-- 批量导入导出
+### 认证接口
+- `POST /api/auth/login` - 用户登录
+- `POST /api/auth/logout` - 用户登出
+- `GET /api/auth/me` - 获取当前用户信息
 
-### 用户管理（管理员）
-- 用户账号管理
-- 角色权限分配
-- 批量导入导出用户
+### 管理接口
+- `GET/POST/PUT/DELETE /api/users` - 用户管理
+- `GET/POST/PUT/DELETE /api/device-types` - 设备类型管理
+- `GET/POST/PUT/DELETE /api/stations` - 站点管理
+- `GET/POST/PUT/DELETE /api/counters` - 柜台管理
+- `GET/POST/PUT/DELETE /api/devices` - 设备管理
 
-### 更换记录
-- 设备移动历史追踪
-- 状态变更记录
-- 搜索和筛选功能
+### 业务接口
+- `POST /api/devices/:id/move` - 移动设备位置
+- `POST /api/devices/:id/status` - 更新设备状态
+- `GET /api/change-records` - 变更记录列表
+- `GET/POST /api/paper-records` - 换纸记录
+- `GET/POST /api/consumable-records` - 耗材记录
 
-### 换纸记录
-- CUSS 自助机换纸记录
-- 耗材使用统计
-- 导出报表
+**完整 API 文档请查看：[项目详解 - API接口清单](docs/项目详解.md#七-api接口完整清单)**
 
-## 📱 浏览器支持
-
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-
-## 🛠️ 技术栈
-
-- **前端框架**: React 19 + Next.js 16
-- **UI 组件**: shadcn/ui
-- **样式**: Tailwind CSS v4
-- **状态管理**: React Context + Hooks
-- **数据存储**: localStorage（开发） / PostgreSQL/MySQL（生产）
-- **类型检查**: TypeScript
-- **构建工具**: Turbopack
-
-## 📦 生产部署
-
-### 环境要求
-
-| 环境 | Node.js | 内存 | 磁盘 |
-|------|---------|------|------|
-| 开发 | 18.17.0+ | 512MB+ | 1GB+ |
-| 生产 | 18.17.0+ | 1GB+ | 2GB+ |
-
-### 部署方式
-
-#### 1. 构建生产版本
+## 📦 可用脚本
 
 ```bash
-npm run build
-npm run start
+# 开发
+npm run dev              # 启动前端开发服务器
+npm run server           # 启动后端开发服务器
+npm run server:dev       # 启动后端开发服务器（watch模式）
+
+# 构建
+npm run build            # 构建生产版本
+npm run start            # 启动生产服务器
+
+# 数据库
+npm run prisma:generate  # 生成 Prisma 客户端
+npm run prisma:migrate   # 运行数据库迁移
+npm run prisma:seed      # 导入初始数据
+npm run prisma:studio    # 打开 Prisma Studio
+
+# 代码检查
+npm run lint             # 运行代码检查
+npm run typecheck        # 运行类型检查
 ```
-
-#### 2. Docker 部署
-
-```bash
-# 构建镜像
-docker build -t airport-equipment .
-
-# 运行容器
-docker run -p 3000:3000 airport-equipment
-```
-
-#### 3. Vercel 部署
-
-1. 在 v0 界面点击"发布"按钮
-2. 选择部署到 Vercel
-3. 按步骤完成部署
-
-#### 4. Linux 服务器部署
-
-详见[完整部署指南](docs/DEPLOYMENT_GUIDE.md)
 
 ## 🔄 数据备份
 
-### 自动备份
+### 自动备份（PostgreSQL）
 
 ```bash
-# PostgreSQL 每日备份脚本
+# 每日备份脚本
 pg_dump -U airport_admin airport_equipment > backup_$(date +%Y%m%d).sql
 ```
 
 ### 手动备份
 - 使用应用内"导出"功能导出所有数据为 CSV
 - 定期保存导出文件到安全位置
+- SQLite 数据库文件可直接复制备份
 
 ## 🐛 常见问题
 
-### Q: 如何修改登录账号？
-A: 进入"用户管理"页面可以添加、编辑、删除用户。
+### Q: 如何修改管理员密码？
+A: 登录后进入"用户管理"页面可以修改用户信息和密码。
 
 ### Q: 数据存储在哪里？
-A: 当前版本存储在浏览器 localStorage 中。迁移到数据库请查看[生产环境配置](docs/PRODUCTION_SETUP.md)。
-
-### Q: 如何备份数据？
-A: 使用导出功能将所有数据导出为 CSV 文件，或定期进行数据库备份。
+A: 生产版数据存储在数据库中（SQLite/PostgreSQL/MySQL），默认使用 SQLite。
 
 ### Q: 支持多用户同时操作吗？
-A: 当前 localStorage 版本不支持实时同步。迁移到数据库后完全支持。
+A: 是的，生产版完全支持多用户并发操作，数据实时同步。
 
-### Q: 如何处理大量数据？
-A: 使用批量导入导出功能，支持 CSV 格式的大数据量操作。
+### Q: 如何从演示版升级到生产版？
+A: 先导出演示版数据为 CSV，然后在生产版中导入。
 
 ### Q: 备机设备如何安装到柜台？
 A: 在仪表盘或站点管理中，点击柜台的"添加设备"按钮，从备机区选择设备即可安装。
 
 ### Q: 设备状态如何流转？
-A: 使用中 → 损坏 → 送修 → 备机 → 使用中
+A: 使用中 → 损坏 → 送修 → 备机 → 使用中，每次变更都需要填写原因。
 
 ## 📞 支持和反馈
 
-- 查看[详细部署指南](docs/DEPLOYMENT_GUIDE.md)了解所有部署方式
-- 查看[生产环境配置](docs/PRODUCTION_SETUP.md)了解数据库集成
+- 查看 [详细部署指南](docs/DEPLOYMENT_GUIDE.md) 了解所有部署方式
+- 查看 [生产环境配置](docs/PRODUCTION_SETUP.md) 了解数据库集成
 - 检查浏览器控制台（F12）查看错误信息
 - 确保已安装 Node.js 18.17.0 或更高版本
 
@@ -279,6 +298,6 @@ MIT License - 详见 LICENSE 文件
 
 ---
 
-**版本**: 1.0.0  
+**版本**: 2.0.0  
 **最后更新**: 2026年6月  
 **项目状态**: 可部署上线

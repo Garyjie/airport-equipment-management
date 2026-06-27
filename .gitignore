@@ -25,3 +25,23 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# database
+*.db
+*.db-journal
+prisma/*.db
+prisma/*.db-journal
+
+# logs
+*.log
+
+# test files
+test/
+*.test.js
+*.spec.js
+
+# temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db

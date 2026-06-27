@@ -39,6 +39,7 @@ import { useStoreContext } from '@/lib/store-context'
 import { statusColors, type Device, type DeviceStatus, type DeviceChangeRecord, generateId } from '@/lib/types'
 import { DeviceCard } from './device-card'
 import { MapPin, Monitor, Plane, AlertTriangle, Wrench, Package, Plus, Search, Check } from 'lucide-react'
+import { toast } from 'sonner'
 
 export function StationView() {
   const router = useRouter()
@@ -134,14 +135,13 @@ export function StationView() {
   }
 
   // 确认选择设备
-  const handleConfirmSelectDevice = () => {
+  const handleConfirmSelectDevice = async () => {
     const { stationId, counterId, selectedDeviceId: deviceId } = selectDeviceDialog
     if (!deviceId || !currentUser) return
 
     const device = devices.find(d => d.id === deviceId)
     if (!device || device.status !== 'standby') return
 
-    // 检查目标位置是否已有同类型设备
     const existingDevice = devices.find(d => 
       d.stationId === stationId && 
       d.counterId === counterId && 
@@ -150,7 +150,6 @@ export function StationView() {
     )
 
     if (existingDevice) {
-      // 关闭选择对话框，显示替换确认对话框
       setSelectDeviceDialog(prev => ({ ...prev, open: false }))
       setReplaceDialog({
         open: true,
@@ -160,67 +159,57 @@ export function StationView() {
         existingDeviceId: existingDevice.id,
       })
     } else {
-      // 直接安装到柜台
-      installDeviceToCounter(deviceId, stationId, counterId)
-      setSelectDeviceDialog(prev => ({ ...prev, open: false }))
+      try {
+        await installDeviceToCounter(deviceId, stationId, counterId)
+        toast.success('设备已添加到柜台')
+        setSelectDeviceDialog(prev => ({ ...prev, open: false }))
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : '操作失败')
+      }
     }
   }
 
   // 安装设备到柜台
-  const installDeviceToCounter = (deviceId: string, stationId: string, counterId?: string) => {
+  const installDeviceToCounter = async (deviceId: string, stationId: string, counterId?: string) => {
     if (!currentUser) return
     
-    // 先更新设备位置和状态（使用 updateDevice 确保一次性完成）
-    updateDevice(deviceId, {
+    await updateDevice(deviceId, {
       stationId,
       counterId,
       status: 'active',
     })
-    
-    // 创建变更记录
-    const device = devices.find(d => d.id === deviceId)
-    if (device) {
-      const record: DeviceChangeRecord = {
-        id: generateId(),
-        deviceId,
-        fromStationId: device.stationId || undefined,
-        toStationId: stationId,
-        fromCounterId: device.counterId || undefined,
-        toCounterId: counterId,
-        fromStatus: device.status,
-        toStatus: 'active',
-        reason: '安装到柜台',
-        operatorId: currentUser.id,
-        operatorName: currentUser.name,
-        createdAt: new Date().toISOString(),
-      }
-      addChangeRecord(record)
-    }
   }
 
   // 执行替换操作
-  const handleConfirmReplace = () => {
+  const handleConfirmReplace = async () => {
     if (!currentUser) return
 
     const { standbyDeviceId, targetStationId, targetCounterId, existingDeviceId } = replaceDialog
 
-    if (existingDeviceId) {
-      // 将现有设备下架到备机区，创建变更记录
-      changeDeviceStatus(existingDeviceId, 'standby', '被替换下架')
+    try {
+      if (existingDeviceId) {
+        await changeDeviceStatus(existingDeviceId, 'standby', '被替换下架')
+      }
+
+      await installDeviceToCounter(standbyDeviceId, targetStationId, targetCounterId)
+
+      toast.success('设备替换成功')
+      setReplaceDialog({ open: false, standbyDeviceId: '', targetStationId: '', targetCounterId: undefined, existingDeviceId: undefined })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '替换失败')
     }
-
-    // 安装新设备
-    installDeviceToCounter(standbyDeviceId, targetStationId, targetCounterId)
-
-    setReplaceDialog({ open: false, standbyDeviceId: '', targetStationId: '', targetCounterId: undefined, existingDeviceId: undefined })
   }
 
   // 设备状态变更处理
-  const handleStatusChange = (deviceId: string, status: DeviceStatus, reason?: string) => {
+  const handleStatusChange = async (deviceId: string, status: DeviceStatus, reason?: string) => {
     if (!currentUser) return
     
-    // 使用 changeDeviceStatus 函数，它会记录变更记录并处理状态变更逻辑
-    changeDeviceStatus(deviceId, status, reason)
+    try {
+      await changeDeviceStatus(deviceId, status, reason)
+      toast.success('设备状态已更新')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
+    }
   }
 
   // 换纸记录
@@ -229,16 +218,21 @@ export function StationView() {
     setPaperDialogOpen(true)
   }
 
-  const handlePaperSubmit = () => {
+  const handlePaperSubmit = async () => {
     if (!selectedDeviceId || !currentUser) return
-    addPaperRecord({
-      deviceId: selectedDeviceId,
-      operatorId: currentUser.id,
-      operatorName: currentUser.name,
-      ...paperForm,
-    })
-    setPaperDialogOpen(false)
-    setPaperForm({ paperType: '热敏纸', quantity: 1, notes: '' })
+    try {
+      await addPaperRecord({
+        deviceId: selectedDeviceId,
+        operatorId: currentUser.id,
+        operatorName: currentUser.name,
+        ...paperForm,
+      })
+      toast.success('换纸记录已添加')
+      setPaperDialogOpen(false)
+      setPaperForm({ paperType: '热敏纸', quantity: 1, notes: '' })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : '操作失败')
+    }
   }
 
   // 只获取使用中的设备（在柜台里的）

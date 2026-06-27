@@ -15,7 +15,7 @@ import { Plane, Loader2, Sun, Moon } from 'lucide-react'
 
 export function LoginForm() {
   const router = useRouter()
-  const { login, isInitialized, resetData } = useStoreContext()
+  const { login, isInitialized } = useStoreContext()
   const { theme, toggleTheme, mounted } = useTheme()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -27,10 +27,7 @@ export function LoginForm() {
     setError('')
     setLoading(true)
 
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    const user = login(username, password)
+    const user = await login(username, password)
     if (user) {
       router.push('/dashboard')
     } else {
