@@ -127,6 +127,10 @@
       {
         "from": "node_modules/.prisma",
         "to": "node_modules/.prisma"
+      },
+      {
+        "from": "scripts/update.bat",
+        "to": "../update.bat"
       }
     ],
     "target": [
