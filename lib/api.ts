@@ -1,9 +1,22 @@
 import type { User, DeviceType, Device, Station, Counter, DeviceChangeRecord, PaperChangeRecord, ConsumableRecord } from './types'
 
-const isElectron = typeof window !== 'undefined' && window.electron
-const API_BASE_URL = isElectron || process.env.NODE_ENV !== 'production' 
-  ? 'http://localhost:5000/api' 
-  : '/api'
+const isElectron = typeof window !== 'undefined' && !!window.electron
+
+function getApiBaseUrl(): string {
+  if (typeof window === 'undefined') {
+    return 'http://localhost:5000/api'
+  }
+  if (isElectron) {
+    return 'http://localhost:5000/api'
+  }
+  if (process.env.NODE_ENV === 'production') {
+    return '/api'
+  }
+  const { protocol, hostname } = window.location
+  return `${protocol}//${hostname}:5000/api`
+}
+
+const API_BASE_URL = getApiBaseUrl()
 
 export class ApiError extends Error {
   status: number

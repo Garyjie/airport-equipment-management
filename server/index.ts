@@ -46,8 +46,9 @@ async function main() {
     await prisma.$connect()
     console.log('数据库连接成功')
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`服务器运行在 http://localhost:${PORT}`)
+      console.log(`局域网访问: http://<你的IP>:${PORT}`)
     })
   } catch (error) {
     console.error('数据库连接失败:', error)
