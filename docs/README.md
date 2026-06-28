@@ -120,6 +120,8 @@ A: 先看 [DEPLOYMENT_GUIDE.md](./DEPLOYMENT_GUIDE.md)，再看 [PRODUCTION_SETU
 
 | 版本 | 日期 | 更新内容 |
 |------|------|----------|
+| v2.2.0 | 2026-06-28 | 修复局域网访问、修复TypeScript类型推断 |
+| v2.1.0 | 2026-06-28 | 修复状态变更逻辑、添加Electron支持 |
 | v2.0.0 | 2026-06-27 | 生产版发布，新增后端API、数据库、JWT认证 |
 | v1.0.0 | 2026-06 | 演示版发布，纯前端localStorage版本 |
 

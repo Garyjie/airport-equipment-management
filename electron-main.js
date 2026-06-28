@@ -93,7 +93,7 @@ const menuTemplate = [
         click: async () => {
           await dialog.showMessageBox(mainWindow, {
             title: '机场设备管理系统',
-            message: '机场设备管理系统 v2.0.0\n\n基于 Next.js + Express + Electron 构建\n\n默认账号：admin / admin123',
+            message: '机场设备管理系统 v2.2.0\n\n基于 Next.js + Express + Electron 构建\n\n默认账号：admin / admin123',
             icon: path.join(__dirname, 'public', 'icon.svg'),
           })
         },
