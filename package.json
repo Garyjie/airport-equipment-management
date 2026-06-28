@@ -10,13 +10,16 @@
     "start": "next start",
     "server": "tsx server/index.ts",
     "server:dev": "tsx watch server/index.ts",
+    "server:build": "prisma generate && esbuild server/index.ts --bundle --platform=node --outfile=server/dist/index.js --external:better-sqlite3 --external:@prisma/client --external:bcryptjs --external:jsonwebtoken",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "tsx server/seed.ts",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "npm run build && electron-builder",
-    "electron:pack": "npm run build && electron-builder --dir",
-    "electron:release": "npm run build && electron-builder --win --publish never"
+    "electron:build": "npm run build && npm run server:build && electron-builder",
+    "electron:pack": "npm run build && npm run server:build && electron-builder --dir",
+    "electron:release": "npm run build && npm run server:build && electron-builder --win --publish never",
+    "electron:publish": "npm run build && npm run server:build && electron-builder --win --publish always",
+    "electron:publish:pre": "npm run build && npm run server:build && electron-builder --win --publish onTagOrDraft"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -108,9 +111,10 @@
     "directories": {
       "output": "release"
     },
+    "asar": false,
     "files": [
       ".next/**/*",
-      "server/**/*",
+      "server/dist/**/*",
       "prisma/**/*",
       "public/**/*",
       "electron-main.js",
@@ -119,10 +123,23 @@
       ".env",
       "node_modules/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "node_modules/.prisma",
+        "to": "node_modules/.prisma"
+      }
+    ],
     "target": [
       {
         "target": "nsis",
         "arch": ["x64"]
+      }
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "GaryJie",
+        "repo": "airport-equipment-management"
       }
     ]
   }
