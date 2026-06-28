@@ -1,6 +1,9 @@
 import type { User, DeviceType, Device, Station, Counter, DeviceChangeRecord, PaperChangeRecord, ConsumableRecord } from './types'
 
-const API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:5000/api'
+const isElectron = typeof window !== 'undefined' && window.electron
+const API_BASE_URL = isElectron || process.env.NODE_ENV !== 'production' 
+  ? 'http://localhost:5000/api' 
+  : '/api'
 
 export class ApiError extends Error {
   status: number

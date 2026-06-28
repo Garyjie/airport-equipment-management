@@ -32,6 +32,11 @@ next-env.d.ts
 prisma/*.db
 prisma/*.db-journal
 
+# electron
+release/
+dist/
+server/dist/
+
 # logs
 *.log
 

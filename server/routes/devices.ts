@@ -310,9 +310,9 @@ router.post('/:id/status', authenticateToken, async (req, res) => {
 
     const operator = await prisma.user.findUnique({ where: { id: req.user!.id } })
 
-    const shouldClearCounter = device.status === 'active' && status !== 'active'
-    const newCounterId = shouldClearCounter ? null : device.counterId
-    const newStationId = shouldClearCounter ? null : device.stationId
+    const isActiveStatus = status === 'active'
+    const newCounterId = isActiveStatus ? device.counterId : null
+    const newStationId = isActiveStatus ? device.stationId : null
 
     await prisma.device.update({
       where: { id: req.params.id },

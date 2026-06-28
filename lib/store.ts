@@ -82,7 +82,7 @@ export function useStore() {
         return
       }
 
-      const [deviceTypes, devices, stations, counters, changeRecords, paperRecords, consumableRecords, users] = await Promise.all([
+      const basePromises = [
         deviceTypeApi.getAll(),
         deviceApi.getAll(),
         stationApi.getAll(),
@@ -90,7 +90,13 @@ export function useStore() {
         changeRecordApi.getAll(),
         paperRecordApi.getAll(),
         consumableRecordApi.getAll(),
-        userApi.getAll(),
+      ]
+
+      const usersPromise = currentUser.role === 'admin' ? userApi.getAll() : Promise.resolve([])
+
+      const [deviceTypes, devices, stations, counters, changeRecords, paperRecords, consumableRecords, users] = await Promise.all([
+        ...basePromises,
+        usersPromise,
       ])
 
       setState(prev => ({
