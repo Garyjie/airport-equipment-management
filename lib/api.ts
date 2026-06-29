@@ -9,11 +9,7 @@ function getApiBaseUrl(): string {
   if (isElectron) {
     return 'http://localhost:5000/api'
   }
-  if (process.env.NODE_ENV === 'production') {
-    return '/api'
-  }
-  const { protocol, hostname } = window.location
-  return `${protocol}//${hostname}:5000/api`
+  return '/api'
 }
 
 const API_BASE_URL = getApiBaseUrl()

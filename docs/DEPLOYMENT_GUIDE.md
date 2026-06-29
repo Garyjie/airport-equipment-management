@@ -327,66 +327,243 @@ pm2 start npm --name "airport-frontend" -- start
 
 ## Docker 部署
 
-### 使用 Docker Compose（推荐）
+### 为什么用 Docker？
 
-创建 `docker-compose.yml` 文件：
+Docker 可以把整个应用（前端、后端、数据库）打包成"集装箱"，一次配置，到处运行。
+不用担心环境不一致的问题，部署就像启动一个程序一样简单。
 
-```yaml
-version: '3.8'
+### 部署到 Windows 还是 Linux？
 
-services:
-  backend:
-    build: .
-    command: npm run server
-    ports:
-      - "5000:5000"
-    environment:
-      - NODE_ENV=production
-      - DATABASE_URL=postgresql://airport_admin:password@db:5432/airport_equipment
-      - JWT_SECRET=your_jwt_secret_key_32_characters_min
-    depends_on:
-      - db
-    restart: unless-stopped
+**推荐：Linux（生产环境首选）**
 
-  frontend:
-    build: .
-    command: npm run start
-    ports:
-      - "3000:3000"
-    environment:
-      - NODE_ENV=production
-      - NEXT_PUBLIC_API_URL=http://localhost:5000
-    depends_on:
-      - backend
-    restart: unless-stopped
+| 对比项 | Linux 服务器 | Windows 服务器 |
+|--------|-------------|---------------|
+| Docker 性能 | ⭐⭐⭐⭐⭐ 原生运行 | ⭐⭐⭐ 需要虚拟化，有损耗 |
+| 资源占用 | 低（几百MB内存） | 高（系统本身开销大） |
+| 稳定性 | 高，适合7x24运行 | 一般，常需更新重启 |
+| 成本 | 低（免费发行版） | 高（需购买授权） |
 
-  db:
-    image: postgres:15-alpine
-    ports:
-      - "5432:5432"
-    environment:
-      - POSTGRES_DB=airport_equipment
-      - POSTGRES_USER=airport_admin
-      - POSTGRES_PASSWORD=your_secure_password
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
+**结论：**
+- 生产环境 → 选 **Linux**（推荐 Ubuntu 22.04/24.04）
+- 本地测试 → Windows 装 Docker Desktop 也可以
 
-volumes:
-  postgres_data:
+### 架构说明
+
+Docker 部署包含 3 个容器，互相配合工作：
+
+```
+用户浏览器 → Nginx (80端口) → 前端 (3000端口)
+                           → 后端 API (5000端口)
+                           → 数据库 PostgreSQL (5432端口)
 ```
 
-运行：
+- **Nginx**: 反向代理，统一入口，把 `/api` 请求转发给后端
+- **app**: 应用容器，同时运行前端和后端
+- **db**: PostgreSQL 数据库容器，数据持久化存储
+
+### 准备工作
+
+#### 1. 安装 Docker 和 Docker Compose
+
+**Linux (Ubuntu/Debian):**
+```bash
+# 更新软件源
+sudo apt-get update
+
+# 安装必要的包
+sudo apt-get install -y ca-certificates curl gnupg
+
+# 添加 Docker 官方 GPG 密钥
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+
+# 添加 Docker 软件源
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | \
+  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# 安装 Docker
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+
+# 验证安装
+docker --version
+docker compose version
+```
+
+**Windows:**
+1. 下载 Docker Desktop：https://www.docker.com/products/docker-desktop/
+2. 安装时勾选 "Use WSL 2 instead of Hyper-V"（推荐）
+3. 安装完成后启动 Docker Desktop
+4. 打开 PowerShell 验证：
+   ```powershell
+   docker --version
+   docker compose version
+   ```
+
+#### 2. 获取项目代码
+
+```bash
+git clone <项目地址> airport-equipment-management
+cd airport-equipment-management
+```
+
+### 快速部署（3步搞定）
+
+#### 第1步：配置环境变量
+
+```bash
+# 复制环境变量模板
+cp .env.docker.example .env.docker
+
+# 编辑配置文件（修改密码和密钥）
+nano .env.docker
+```
+
+**必须修改的配置项：**
+- `POSTGRES_PASSWORD`: 数据库密码（改成你自己的强密码）
+- `DATABASE_URL`: 里面的密码要和上面一致
+- `JWT_SECRET`: 至少32位随机字符串，用于加密登录Token
+
+**生成随机密钥的方法（Linux）：**
+```bash
+openssl rand -base64 48
+```
+
+#### 第2步：构建并启动
+
+```bash
+# 构建镜像并后台启动所有服务
+docker compose up -d --build
+```
+
+第一次启动需要下载镜像和构建，大约需要 5-10 分钟，请耐心等待。
+
+#### 第3步：验证部署
+
+```bash
+# 查看所有容器状态，应该都是 Up 状态
+docker compose ps
+
+# 查看启动日志
+docker compose logs -f app
+```
+
+看到类似以下输出就说明启动成功了：
+```
+🚀 服务器运行在 http://0.0.0.0:5000
+✓ Ready in 2.3s
+```
+
+**访问应用：**
+打开浏览器访问 `http://你的服务器IP`
+
+**默认登录账号：**
+| 用户名 | 密码 | 角色 |
+|--------|------|------|
+| admin | admin123 | 管理员 |
+| operator | operator123 | 普通用户 |
+
+### 常用操作命令
+
 ```bash
 # 启动服务
-docker-compose up -d
-
-# 查看日志
-docker-compose logs -f
+docker compose up -d
 
 # 停止服务
-docker-compose down
+docker compose down
+
+# 重启服务
+docker compose restart
+
+# 查看日志
+docker compose logs -f app       # 查看应用日志
+docker compose logs -f db        # 查看数据库日志
+docker compose logs -f nginx     # 查看 Nginx 日志
+
+# 进入应用容器
+docker exec -it airport-app sh
+
+# 重新构建（代码更新后）
+docker compose up -d --build
+
+# 查看资源占用
+docker stats
 ```
+
+### 数据库备份与恢复
+
+#### 备份数据库
+```bash
+docker exec airport-db pg_dump -U airport_admin airport_equipment > backup_$(date +%Y%m%d).sql
+```
+
+#### 恢复数据库
+```bash
+# 先停止应用
+docker compose stop app
+
+# 恢复数据
+docker exec -i airport-db psql -U airport_admin -d airport_equipment < backup_20240101.sql
+
+# 重启应用
+docker compose start app
+```
+
+### 更新应用版本
+
+```bash
+# 1. 拉取最新代码
+git pull
+
+# 2. 重新构建并启动
+docker compose up -d --build
+
+# 3. 查看状态
+docker compose ps
+```
+
+### 配置 HTTPS（可选）
+
+如果需要配置 HTTPS，建议在 Nginx 前面再加一层反向代理（如 Traefik），或者直接修改 nginx.conf 添加 SSL 配置。
+
+**简单方案：使用 Let's Encrypt + certbot**
+
+在服务器上直接安装 certbot，然后在宿主机 Nginx 上配置 SSL（不要在 Docker 的 Nginx 里配置）。
+
+### 常见问题
+
+**Q1: 启动后访问不了？**
+- 检查容器状态：`docker compose ps`，确保都是 Up
+- 检查防火墙是否开放了 80 端口
+- 查看日志找错误：`docker compose logs app`
+
+**Q2: 数据库连不上？**
+- 确认 `.env.docker` 中 `DATABASE_URL` 的密码和 `POSTGRES_PASSWORD` 一致
+- 数据库启动需要一点时间，等待 30 秒后再试
+- 查看数据库日志：`docker compose logs db`
+
+**Q3: 忘记管理员密码怎么办？**
+```bash
+# 进入数据库容器
+docker exec -it airport-db psql -U airport_admin -d airport_equipment
+
+# 重置密码为 admin123（bcrypt 加密后的值）
+UPDATE "User" SET password = '$2a$10$YourBcryptHashHere' WHERE username = 'admin';
+
+# 退出
+\q
+```
+
+**Q4: 如何修改端口？**
+编辑 `docker-compose.yml`，修改 nginx 的 ports 映射：
+```yaml
+ports:
+  - "8080:80"   # 左边是宿主机端口，改成你想要的
+```
+然后重启：`docker compose up -d`
 
 ---
 
