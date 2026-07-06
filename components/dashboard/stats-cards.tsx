@@ -182,15 +182,15 @@ export function StatsCards() {
             <DialogHeader>
               <DialogTitle>站点详情 ({stations.length} 个站点)</DialogTitle>
             </DialogHeader>
-            <ScrollArea className="max-h-[60vh]">
-              <Table>
+            <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
+              <Table className="min-w-[500px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>站点名称</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead>柜台数</TableHead>
-                    <TableHead>设备数</TableHead>
-                    <TableHead>在线率</TableHead>
+                    <TableHead className="w-[140px]">站点名称</TableHead>
+                    <TableHead className="w-[100px]">类型</TableHead>
+                    <TableHead className="w-[80px]">柜台数</TableHead>
+                    <TableHead className="w-[80px]">设备数</TableHead>
+                    <TableHead className="w-[80px]">在线率</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -219,7 +219,7 @@ export function StatsCards() {
                   })}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           </>
         )
       case 'abnormal':
@@ -229,15 +229,15 @@ export function StatsCards() {
             <DialogHeader>
               <DialogTitle>异常设备 ({abnormalDevices.length})</DialogTitle>
             </DialogHeader>
-            <ScrollArea className="max-h-[60vh]">
-              <Table>
+            <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
+              <Table className="min-w-[600px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>设备名称</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead>状态</TableHead>
-                    <TableHead>序列号</TableHead>
-                    <TableHead>原站点</TableHead>
+                    <TableHead className="w-[140px]">设备名称</TableHead>
+                    <TableHead className="w-[140px]">类型</TableHead>
+                    <TableHead className="w-[80px]">状态</TableHead>
+                    <TableHead className="w-[140px]">序列号</TableHead>
+                    <TableHead className="w-[100px]">原站点</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -259,7 +259,7 @@ export function StatsCards() {
                   })}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           </>
         )
       case 'standby':
@@ -269,14 +269,14 @@ export function StatsCards() {
             <DialogHeader>
               <DialogTitle>备用设备 ({standbyDevices.length})</DialogTitle>
             </DialogHeader>
-            <ScrollArea className="max-h-[60vh]">
-              <Table>
+            <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
+              <Table className="min-w-[500px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead>设备名称</TableHead>
-                    <TableHead>类型</TableHead>
-                    <TableHead>序列号</TableHead>
-                    <TableHead>存放位置</TableHead>
+                    <TableHead className="w-[140px]">设备名称</TableHead>
+                    <TableHead className="w-[140px]">类型</TableHead>
+                    <TableHead className="w-[140px]">序列号</TableHead>
+                    <TableHead className="w-[100px]">存放位置</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -290,7 +290,7 @@ export function StatsCards() {
                   ))}
                 </TableBody>
               </Table>
-            </ScrollArea>
+            </div>
           </>
         )
       default:
@@ -331,7 +331,7 @@ export function StatsCards() {
       </div>
 
       <Dialog open={drillDown !== null} onOpenChange={(open) => !open && setDrillDown(null)}>
-        <DialogContent className="max-w-5xl max-h-[70vh] overflow-hidden">
+        <DialogContent className="max-w-none max-h-[70vh] overflow-hidden min-w-[600px]">
           {renderDrillDownContent()}
         </DialogContent>
       </Dialog>

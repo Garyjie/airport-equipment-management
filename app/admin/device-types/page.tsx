@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useStoreContext } from '@/lib/store-context'
+import { useAuthRedirect } from '@/hooks/use-auth-redirect'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
@@ -165,9 +166,8 @@ const iconOptions = [
 
 export default function DeviceTypesPage() {
   const router = useRouter()
+  const { isInitialized, currentUser } = useAuthRedirect(true)
   const {
-    currentUser,
-    isInitialized,
     deviceTypes,
     devices,
     addDeviceType,
@@ -250,9 +250,6 @@ export default function DeviceTypesPage() {
   }
 
   useEffect(() => {
-    if (isInitialized && !currentUser) {
-      router.push('/')
-    }
     if (isInitialized && currentUser?.role !== 'admin') {
       router.push('/dashboard')
     }

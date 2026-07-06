@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useStoreContext } from '@/lib/store-context'
+import { useAuthRedirect } from '@/hooks/use-auth-redirect'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
@@ -47,9 +48,8 @@ import { toast } from 'sonner'
 
 export default function UsersPage() {
   const router = useRouter()
+  const { isInitialized, currentUser } = useAuthRedirect(true)
   const {
-    currentUser,
-    isInitialized,
     users,
     addUser,
     updateUser,
@@ -187,9 +187,6 @@ export default function UsersPage() {
   }, [users, addUser])
 
   useEffect(() => {
-    if (isInitialized && !currentUser) {
-      router.push('/')
-    }
     if (isInitialized && currentUser?.role !== 'admin') {
       router.push('/dashboard')
     }

@@ -2,6 +2,8 @@ import express from 'express'
 import prisma from '../prisma'
 import { authenticateToken } from '../middleware/auth'
 
+console.log('[DEVICES ROUTE] Loaded at', new Date().toISOString())
+
 const router = express.Router()
 
 router.get('/', authenticateToken, async (req, res) => {
@@ -89,8 +91,9 @@ router.post('/', authenticateToken, async (req, res) => {
       },
     })
 
+    let changeRecord = null
     if (operator) {
-      await prisma.deviceChangeRecord.create({
+      changeRecord = await prisma.deviceChangeRecord.create({
         data: {
           deviceId: device.id,
           fromStationId: undefined,
@@ -119,6 +122,7 @@ router.post('/', authenticateToken, async (req, res) => {
     const result = {
       ...device,
       customData: device.customData ? JSON.parse(device.customData) : {},
+      changeRecord,
     }
     res.status(201).json(result)
   } catch (error) {
@@ -167,8 +171,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
       },
     })
 
+    let changeRecord = null
     if (shouldCreateRecord && operator) {
-      await prisma.deviceChangeRecord.create({
+      changeRecord = await prisma.deviceChangeRecord.create({
         data: {
           deviceId: device.id,
           fromStationId: existingDevice.stationId,
@@ -200,6 +205,7 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const result = {
       ...device,
       customData: typeof customDataParsed === 'object' && customDataParsed !== null ? customDataParsed : {},
+      changeRecord,
     }
     res.json(result)
   } catch (error) {
@@ -222,8 +228,9 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       data: { isActive: false },
     })
 
+    let changeRecord = null
     if (operator) {
-      await prisma.deviceChangeRecord.create({
+      changeRecord = await prisma.deviceChangeRecord.create({
         data: {
           deviceId: device.id,
           fromStationId: device.stationId,
@@ -248,7 +255,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       },
     })
 
-    res.json({ message: '设备已删除' })
+    res.json({ message: '设备已删除', changeRecord })
   } catch (error) {
     res.status(500).json({ error: '删除设备失败' })
   }
@@ -276,8 +283,9 @@ router.post('/:id/move', authenticateToken, async (req, res) => {
       },
     })
 
+    let changeRecord = null
     if (operator) {
-      await prisma.deviceChangeRecord.create({
+      changeRecord = await prisma.deviceChangeRecord.create({
         data: {
           deviceId: device.id,
           fromStationId: device.stationId,
@@ -293,7 +301,7 @@ router.post('/:id/move', authenticateToken, async (req, res) => {
       })
     }
 
-    res.json({ message: '设备已移动' })
+    res.json({ message: '设备已移动', changeRecord })
   } catch (error) {
     res.status(500).json({ error: '移动设备失败' })
   }
@@ -323,8 +331,9 @@ router.post('/:id/status', authenticateToken, async (req, res) => {
       },
     })
 
+    let changeRecord = null
     if (operator) {
-      await prisma.deviceChangeRecord.create({
+      changeRecord = await prisma.deviceChangeRecord.create({
         data: {
           deviceId: device.id,
           fromStationId: device.stationId,
@@ -340,9 +349,109 @@ router.post('/:id/status', authenticateToken, async (req, res) => {
       })
     }
 
-    res.json({ message: '设备状态已更新' })
+    res.json({ message: '设备状态已更新', changeRecord })
   } catch (error) {
     res.status(500).json({ error: '更新设备状态失败' })
+  }
+})
+
+router.post('/batch', authenticateToken, async (req, res) => {
+  try {
+    const { devices: devicesData } = req.body
+
+    if (!devicesData || !Array.isArray(devicesData) || devicesData.length === 0) {
+      return res.status(400).json({ error: '设备数据不能为空' })
+    }
+
+    const operator = await prisma.user.findUnique({ where: { id: req.user!.id } })
+
+    const existingDevices = await prisma.device.findMany({
+      where: {
+        serialNumber: {
+          in: devicesData.map(d => d.serialNumber),
+        },
+      },
+      select: { serialNumber: true },
+    })
+
+    const existingSerialNumbers = new Set(existingDevices.map(d => d.serialNumber))
+    const newDevicesData = devicesData.filter(d => !existingSerialNumbers.has(d.serialNumber))
+
+    if (newDevicesData.length === 0) {
+      return res.status(200).json({ createdCount: 0, devices: [] })
+    }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const createdDevices = await tx.device.createMany({
+        data: newDevicesData.map(d => ({
+          name: d.name,
+          typeId: d.typeId,
+          serialNumber: d.serialNumber,
+          status: d.status || 'standby',
+          stationId: d.stationId && d.stationId !== 'none' ? d.stationId : null,
+          counterId: d.counterId && d.counterId !== 'none' ? d.counterId : null,
+          position: d.position || 0,
+          customData: JSON.stringify(d.customData || {}),
+          notes: d.notes,
+        })),
+      })
+
+      const insertedDevices = await tx.device.findMany({
+        where: {
+          serialNumber: {
+            in: newDevicesData.map(d => d.serialNumber),
+          },
+        },
+      })
+
+      let changeRecords: typeof result.changeRecords = []
+      if (operator && insertedDevices.length > 0) {
+        changeRecords = await Promise.all(
+          insertedDevices.map(device =>
+            tx.deviceChangeRecord.create({
+              data: {
+                deviceId: device.id,
+                fromStationId: undefined,
+                toStationId: device.stationId,
+                fromCounterId: undefined,
+                toCounterId: device.counterId,
+                fromStatus: undefined,
+                toStatus: device.status,
+                reason: '批量导入设备',
+                operatorId: operator.id,
+                operatorName: operator.name,
+              },
+            })
+          )
+        )
+      }
+
+      if (insertedDevices.length > 0) {
+        await tx.auditLog.createMany({
+          data: insertedDevices.map(device => ({
+            userId: req.user!.id,
+            action: 'create',
+            resourceType: 'device',
+            resourceId: device.id,
+            details: JSON.stringify({ name: device.name, typeId: device.typeId, serialNumber: device.serialNumber }),
+          })),
+        })
+      }
+
+      return {
+        createdCount: createdDevices.count,
+        devices: insertedDevices.map(d => ({
+          ...d,
+          customData: d.customData ? JSON.parse(d.customData) : {},
+        })),
+        changeRecords,
+      }
+    })
+
+    res.status(201).json(result)
+  } catch (error) {
+    console.error('批量导入设备错误:', error)
+    res.status(500).json({ error: '批量导入设备失败' })
   }
 })
 

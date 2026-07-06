@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useStoreContext } from '@/lib/store-context'
+import { useAuthRedirect } from '@/hooks/use-auth-redirect'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
@@ -21,10 +21,8 @@ import { statusColors } from '@/lib/types'
 import { Download, Search, ArrowRight, History, Loader2 } from 'lucide-react'
 
 export default function ChangeRecordsPage() {
-  const router = useRouter()
+  const { isInitialized, currentUser } = useAuthRedirect(true)
   const {
-    currentUser,
-    isInitialized,
     devices,
     stations,
     counters,
@@ -32,12 +30,6 @@ export default function ChangeRecordsPage() {
   } = useStoreContext()
 
   const [search, setSearch] = useState('')
-
-  useEffect(() => {
-    if (isInitialized && !currentUser) {
-      router.push('/')
-    }
-  }, [isInitialized, currentUser, router])
 
   const filteredRecords = changeRecords.filter(record => {
     const device = devices.find(d => d.id === record.deviceId)

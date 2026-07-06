@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { useStoreContext } from '@/lib/store-context'
+import { useAuthRedirect } from '@/hooks/use-auth-redirect'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
@@ -38,10 +38,8 @@ import { Download, Search, Loader2, Plus, FileText } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function PaperRecordsPage() {
-  const router = useRouter()
+  const { isInitialized, currentUser } = useAuthRedirect(true)
   const {
-    currentUser,
-    isInitialized,
     devices,
     deviceTypes,
     paperRecords,
@@ -56,12 +54,6 @@ export default function PaperRecordsPage() {
     quantity: 1,
     notes: '',
   })
-
-  useEffect(() => {
-    if (isInitialized && !currentUser) {
-      router.push('/')
-    }
-  }, [isInitialized, currentUser, router])
 
   // Get CUSS devices only
   const cussType = deviceTypes.find(t => t.name.includes('CUSS'))

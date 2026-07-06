@@ -234,25 +234,38 @@ export const deviceApi = {
     }
   },
   create: async (data: Omit<Device, 'id' | 'createdAt' | 'updatedAt'>) =>
-    request<Device>('/devices', {
+    request<Device & { changeRecord: DeviceChangeRecord | null }>('/devices', {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  createMany: async (devices: Omit<Device, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+    const result = await request<{ createdCount: number; devices: Device[]; changeRecords: DeviceChangeRecord[] }>('/devices/batch', {
+      method: 'POST',
+      body: JSON.stringify({ devices }),
+    })
+    return {
+      ...result,
+      devices: result.devices.map(d => ({
+        ...d,
+        customData: typeof d.customData === 'string' ? JSON.parse(d.customData) : d.customData,
+      })),
+    }
+  },
   update: async (id: string, data: Partial<Device>) => {
-    return request<Device>(`/devices/${id}`, {
+    return request<Device & { changeRecord: DeviceChangeRecord | null }>(`/devices/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     })
   },
   delete: async (id: string) =>
-    request<void>(`/devices/${id}`, { method: 'DELETE' }),
-  move: async (id: string, toStationId: string, toCounterId?: string, reason?: string) =>
-    request<Device>(`/devices/${id}/move`, {
+    request<{ message: string; changeRecord: DeviceChangeRecord | null }>(`/devices/${id}`, { method: 'DELETE' }),
+  move: async (id: string, stationId: string, counterId?: string, reason?: string) =>
+    request<{ message: string; changeRecord: DeviceChangeRecord | null }>(`/devices/${id}/move`, {
       method: 'POST',
-      body: JSON.stringify({ toStationId, toCounterId, reason }),
+      body: JSON.stringify({ stationId, counterId, reason }),
     }),
   changeStatus: async (id: string, status: Device['status'], reason?: string) =>
-    request<Device>(`/devices/${id}/status`, {
+    request<{ message: string; changeRecord: DeviceChangeRecord | null }>(`/devices/${id}/status`, {
       method: 'POST',
       body: JSON.stringify({ status, reason }),
     }),

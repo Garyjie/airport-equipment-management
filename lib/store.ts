@@ -221,24 +221,45 @@ export function useStore() {
 
   const addDevice = useCallback(async (device: Omit<Device, 'id' | 'createdAt' | 'updatedAt'>) => {
     try {
-      const newDevice = await deviceApi.create(device)
-      setState(prev => ({ ...prev, devices: [...prev.devices, newDevice] }))
-      await loadData()
-      return newDevice
+      const result = await deviceApi.create(device)
+      setState(prev => ({ 
+        ...prev, 
+        devices: [...prev.devices, result],
+        changeRecords: result.changeRecord ? [result.changeRecord, ...prev.changeRecords] : prev.changeRecords,
+      }))
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : '添加设备失败')
       throw err
     }
-  }, [loadData, setError])
+  }, [setError])
+
+  const addDevices = useCallback(async (devices: Omit<Device, 'id' | 'createdAt' | 'updatedAt'>[]) => {
+    try {
+      const result = await deviceApi.createMany(devices)
+      setState(prev => ({ 
+        ...prev, 
+        devices: [...prev.devices, ...result.devices],
+        changeRecords: result.changeRecords && result.changeRecords.length > 0 
+          ? [...result.changeRecords, ...prev.changeRecords] 
+          : prev.changeRecords,
+      }))
+      return result
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '批量添加设备失败')
+      throw err
+    }
+  }, [setError])
 
   const updateDevice = useCallback(async (id: string, updates: Partial<Device>) => {
     try {
-      const updatedDevice = await deviceApi.update(id, updates)
+      const result = await deviceApi.update(id, updates)
       setState(prev => ({
         ...prev,
-        devices: prev.devices.map(d => d.id === id ? updatedDevice : d),
+        devices: prev.devices.map(d => d.id === id ? result : d),
+        changeRecords: result.changeRecord ? [result.changeRecord, ...prev.changeRecords] : prev.changeRecords,
       }))
-      return updatedDevice
+      return result
     } catch (err) {
       setError(err instanceof Error ? err.message : '更新设备失败')
       throw err
@@ -247,37 +268,59 @@ export function useStore() {
 
   const deleteDevice = useCallback(async (id: string) => {
     try {
-      await deviceApi.delete(id)
+      const result = await deviceApi.delete(id)
       setState(prev => ({
         ...prev,
         devices: prev.devices.filter(d => d.id !== id),
+        changeRecords: result.changeRecord ? [result.changeRecord, ...prev.changeRecords] : prev.changeRecords,
       }))
-      await loadData()
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除设备失败')
       throw err
     }
-  }, [loadData, setError])
+  }, [setError])
 
   const moveDevice = useCallback(async (deviceId: string, toStationId: string, toCounterId?: string, reason?: string) => {
     try {
-      await deviceApi.move(deviceId, toStationId, toCounterId, reason)
-      await loadData()
+      const stationId = toStationId === 'none' ? null : toStationId
+      const counterId = toCounterId === 'none' ? null : toCounterId
+      const result = await deviceApi.move(deviceId, stationId || '', counterId || '', reason)
+      setState(prev => ({
+        ...prev,
+        devices: prev.devices.map(d => d.id === deviceId
+          ? { ...d, stationId: stationId || '', counterId: counterId || '' }
+          : d
+        ),
+        changeRecords: result.changeRecord ? [result.changeRecord, ...prev.changeRecords] : prev.changeRecords,
+      }))
     } catch (err) {
       setError(err instanceof Error ? err.message : '移动设备失败')
       throw err
     }
-  }, [loadData, setError])
+  }, [setError])
 
   const changeDeviceStatus = useCallback(async (deviceId: string, newStatus: Device['status'], reason?: string) => {
     try {
-      await deviceApi.changeStatus(deviceId, newStatus, reason)
-      await loadData()
+      const result = await deviceApi.changeStatus(deviceId, newStatus, reason)
+      const isActive = newStatus === 'active'
+      setState(prev => ({
+        ...prev,
+        devices: prev.devices.map(d => d.id === deviceId
+          ? {
+              ...d,
+              status: newStatus,
+              stationId: isActive ? d.stationId : '',
+              counterId: isActive ? d.counterId : '',
+            }
+          : d
+        ),
+        changeRecords: result.changeRecord ? [result.changeRecord, ...prev.changeRecords] : prev.changeRecords,
+      }))
     } catch (err) {
       setError(err instanceof Error ? err.message : '变更设备状态失败')
       throw err
     }
-  }, [loadData, setError])
+  }, [setError])
 
   const addStation = useCallback(async (station: Omit<Station, 'id' | 'createdAt'>) => {
     try {
@@ -389,6 +432,7 @@ export function useStore() {
     updateDeviceType,
     deleteDeviceType,
     addDevice,
+    addDevices,
     updateDevice,
     deleteDevice,
     moveDevice,

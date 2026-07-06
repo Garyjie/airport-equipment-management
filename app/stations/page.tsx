@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { useStoreContext } from '@/lib/store-context'
+import { useAuthRedirect } from '@/hooks/use-auth-redirect'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { Button } from '@/components/ui/button'
@@ -50,10 +50,8 @@ import { Plus, MapPin, Monitor, Plane, Trash2, Edit2, Loader2, Download, Upload,
 import { toast } from 'sonner'
 
 export default function StationsPage() {
-  const router = useRouter()
+  const { isInitialized, currentUser } = useAuthRedirect(true)
   const {
-    currentUser,
-    isInitialized,
     stations,
     counters,
     devices,
@@ -248,12 +246,6 @@ export default function StationsPage() {
     
     reader.readAsArrayBuffer(file)
   }, [stations, addStation])
-
-  useEffect(() => {
-    if (isInitialized && !currentUser) {
-      router.push('/')
-    }
-  }, [isInitialized, currentUser, router])
 
   const handleOpenStationDialog = (station?: Station) => {
     if (station) {

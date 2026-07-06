@@ -1,8 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useStoreContext } from '@/lib/store-context'
+import { useAuthRedirect } from '@/hooks/use-auth-redirect'
 import { Sidebar } from '@/components/layout/sidebar'
 import { Header } from '@/components/layout/header'
 import { StatsCards } from '@/components/dashboard/stats-cards'
@@ -10,14 +8,7 @@ import { StationView } from '@/components/dashboard/station-view'
 import { Loader2 } from 'lucide-react'
 
 export default function DashboardPage() {
-  const router = useRouter()
-  const { currentUser, isInitialized } = useStoreContext()
-
-  useEffect(() => {
-    if (isInitialized && !currentUser) {
-      router.push('/')
-    }
-  }, [isInitialized, currentUser, router])
+  const { isInitialized, currentUser } = useAuthRedirect(true)
 
   if (!isInitialized) {
     return (
