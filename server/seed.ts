@@ -71,10 +71,7 @@ async function main() {
     data: { name: 'D指廊登机口', code: 'GD', type: 'gate', description: 'D指廊登机口区域，共4个登机口', positionX: 3, positionY: 1 },
   })
 
-  const stationStore = await prisma.station.create({
-    data: { name: '设备库房', code: 'STORE', type: 'warehouse', description: '备用设备存放区，备机库', positionX: 3, positionY: 0 },
-  })
-  console.log('创建8个站点')
+  console.log('创建7个站点')
 
   await prisma.counter.createMany({
     data: [
@@ -163,9 +160,9 @@ async function main() {
       { name: 'CUSS-C03', typeId: dt1.id, status: 'active', stationId: stationC.id, position: 3, serialNumber: 'CUSS2024003', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
       { name: 'CUSS-C04', typeId: dt1.id, status: 'active', stationId: stationC.id, position: 4, serialNumber: 'CUSS2024004', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
       { name: 'CUSS-C05', typeId: dt1.id, status: 'active', stationId: stationC.id, position: 5, serialNumber: 'CUSS2024005', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
-      { name: 'CUSS-C06', typeId: dt1.id, status: 'standby', stationId: stationStore.id, position: 1, serialNumber: 'CUSS2024006', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
-      { name: 'CUSS-C07', typeId: dt1.id, status: 'standby', stationId: stationStore.id, position: 2, serialNumber: 'CUSS2024007', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
-      { name: 'CUSS-C08', typeId: dt1.id, status: 'repair', stationId: stationStore.id, position: 3, serialNumber: 'CUSS2024008', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
+      { name: 'CUSS-C06', typeId: dt1.id, status: 'standby', stationId: null, position: 1, serialNumber: 'CUSS2024006', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
+      { name: 'CUSS-C07', typeId: dt1.id, status: 'standby', stationId: null, position: 2, serialNumber: 'CUSS2024007', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
+      { name: 'CUSS-C08', typeId: dt1.id, status: 'repair', stationId: null, position: 3, serialNumber: 'CUSS2024008', customData: JSON.stringify({ '纸卷类型': '热敏纸' }) },
 
       { name: 'PC-A01', typeId: dt2.id, status: 'active', stationId: stationA.id, counterId: counterA01.id, position: 1, serialNumber: 'PC2024001', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
       { name: 'PC-A02', typeId: dt2.id, status: 'active', stationId: stationA.id, counterId: counterA02.id, position: 1, serialNumber: 'PC2024002', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
@@ -174,27 +171,27 @@ async function main() {
       { name: 'PC-A05', typeId: dt2.id, status: 'active', stationId: stationA.id, counterId: counterA05.id, position: 1, serialNumber: 'PC2024005', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
       { name: 'PC-B01', typeId: dt2.id, status: 'active', stationId: stationB.id, counterId: counterB01.id, position: 1, serialNumber: 'PC2024006', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
       { name: 'PC-B02', typeId: dt2.id, status: 'active', stationId: stationB.id, counterId: counterB02.id, position: 1, serialNumber: 'PC2024007', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
-      { name: 'PC-备机01', typeId: dt2.id, status: 'standby', stationId: stationStore.id, position: 4, serialNumber: 'PC2024008', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
-      { name: 'PC-备机02', typeId: dt2.id, status: 'standby', stationId: stationStore.id, position: 5, serialNumber: 'PC2024009', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
-      { name: 'PC-损坏01', typeId: dt2.id, status: 'damaged', stationId: stationStore.id, position: 6, serialNumber: 'PC2024010', customData: JSON.stringify({ 'CPU型号': 'Intel i5-10400', '内存大小': '8GB' }) },
+      { name: 'PC-备机01', typeId: dt2.id, status: 'standby', stationId: null, position: 4, serialNumber: 'PC2024008', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
+      { name: 'PC-备机02', typeId: dt2.id, status: 'standby', stationId: null, position: 5, serialNumber: 'PC2024009', customData: JSON.stringify({ 'CPU型号': 'Intel i5-12400', '内存大小': '16GB' }) },
+      { name: 'PC-损坏01', typeId: dt2.id, status: 'damaged', stationId: null, position: 6, serialNumber: 'PC2024010', customData: JSON.stringify({ 'CPU型号': 'Intel i5-10400', '内存大小': '8GB' }) },
 
       { name: '行李秤-A01', typeId: dt3.id, status: 'active', stationId: stationA.id, counterId: counterA01.id, position: 2, serialNumber: 'SC2024001', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
       { name: '行李秤-A02', typeId: dt3.id, status: 'active', stationId: stationA.id, counterId: counterA02.id, position: 2, serialNumber: 'SC2024002', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
       { name: '行李秤-A03', typeId: dt3.id, status: 'active', stationId: stationA.id, counterId: counterA03.id, position: 2, serialNumber: 'SC2024003', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
       { name: '行李秤-A04', typeId: dt3.id, status: 'active', stationId: stationA.id, counterId: counterA04.id, position: 2, serialNumber: 'SC2024004', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
       { name: '行李秤-B01', typeId: dt3.id, status: 'active', stationId: stationB.id, counterId: counterB01.id, position: 2, serialNumber: 'SC2024005', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
-      { name: '行李秤-备机01', typeId: dt3.id, status: 'standby', stationId: stationStore.id, position: 7, serialNumber: 'SC2024006', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
-      { name: '行李秤-送修01', typeId: dt3.id, status: 'repair', stationId: stationStore.id, position: 8, serialNumber: 'SC2024007', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
+      { name: '行李秤-备机01', typeId: dt3.id, status: 'standby', stationId: null, position: 7, serialNumber: 'SC2024006', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
+      { name: '行李秤-送修01', typeId: dt3.id, status: 'repair', stationId: null, position: 8, serialNumber: 'SC2024007', customData: JSON.stringify({ '最大承重(kg)': 50 }) },
 
       { name: '登机牌打印机-A01', typeId: dt4.id, status: 'active', stationId: stationA.id, counterId: counterA01.id, position: 3, serialNumber: 'BP2024001', customData: JSON.stringify({ '纸张规格': '80mm热敏' }) },
       { name: '登机牌打印机-A02', typeId: dt4.id, status: 'active', stationId: stationA.id, counterId: counterA02.id, position: 3, serialNumber: 'BP2024002', customData: JSON.stringify({ '纸张规格': '80mm热敏' }) },
       { name: '登机牌打印机-A03', typeId: dt4.id, status: 'active', stationId: stationA.id, counterId: counterA03.id, position: 3, serialNumber: 'BP2024003', customData: JSON.stringify({ '纸张规格': '80mm热敏' }) },
-      { name: '登机牌打印机-备机01', typeId: dt4.id, status: 'standby', stationId: stationStore.id, position: 9, serialNumber: 'BP2024004', customData: JSON.stringify({ '纸张规格': '80mm热敏' }) },
+      { name: '登机牌打印机-备机01', typeId: dt4.id, status: 'standby', stationId: null, position: 9, serialNumber: 'BP2024004', customData: JSON.stringify({ '纸张规格': '80mm热敏' }) },
 
       { name: '行李条打印机-A01', typeId: dt5.id, status: 'active', stationId: stationA.id, counterId: counterA01.id, position: 4, serialNumber: 'BT2024001', customData: JSON.stringify({ '打印速度': '200mm/s' }) },
       { name: '行李条打印机-A02', typeId: dt5.id, status: 'active', stationId: stationA.id, counterId: counterA02.id, position: 4, serialNumber: 'BT2024002', customData: JSON.stringify({ '打印速度': '200mm/s' }) },
-      { name: '行李条打印机-备机01', typeId: dt5.id, status: 'standby', stationId: stationStore.id, position: 10, serialNumber: 'BT2024003', customData: JSON.stringify({ '打印速度': '200mm/s' }) },
-      { name: '行李条打印机-送修01', typeId: dt5.id, status: 'repair', stationId: stationStore.id, position: 11, serialNumber: 'BT2024004', customData: JSON.stringify({ '打印速度': '200mm/s' }) },
+      { name: '行李条打印机-备机01', typeId: dt5.id, status: 'standby', stationId: null, position: 10, serialNumber: 'BT2024003', customData: JSON.stringify({ '打印速度': '200mm/s' }) },
+      { name: '行李条打印机-送修01', typeId: dt5.id, status: 'repair', stationId: null, position: 11, serialNumber: 'BT2024004', customData: JSON.stringify({ '打印速度': '200mm/s' }) },
 
       { name: '扫描枪-A101', typeId: dt6.id, status: 'active', stationId: stationGA.id, counterId: counterA101.id, position: 1, serialNumber: 'SN2024001', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
       { name: '扫描枪-A102', typeId: dt6.id, status: 'active', stationId: stationGA.id, counterId: counterA102.id, position: 1, serialNumber: 'SN2024002', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
@@ -203,16 +200,16 @@ async function main() {
       { name: '扫描枪-B202', typeId: dt6.id, status: 'active', stationId: stationGB.id, counterId: counterB202.id, position: 1, serialNumber: 'SN2024005', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
       { name: '扫描枪-C301', typeId: dt6.id, status: 'active', stationId: stationGC.id, counterId: counterC301.id, position: 1, serialNumber: 'SN2024006', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
       { name: '扫描枪-D401', typeId: dt6.id, status: 'active', stationId: stationGD.id, counterId: counterD401.id, position: 1, serialNumber: 'SN2024007', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
-      { name: '扫描枪-备机01', typeId: dt6.id, status: 'standby', stationId: stationStore.id, position: 12, serialNumber: 'SN2024008', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
-      { name: '扫描枪-备机02', typeId: dt6.id, status: 'standby', stationId: stationStore.id, position: 13, serialNumber: 'SN2024009', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
+      { name: '扫描枪-备机01', typeId: dt6.id, status: 'standby', stationId: null, position: 12, serialNumber: 'SN2024008', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
+      { name: '扫描枪-备机02', typeId: dt6.id, status: 'standby', stationId: null, position: 13, serialNumber: 'SN2024009', customData: JSON.stringify({ '扫描类型': '全部支持' }) },
 
       { name: '身份证阅读器-A01', typeId: dt7.id, status: 'active', stationId: stationA.id, counterId: counterA01.id, position: 5, serialNumber: 'ID2024001', customData: '{}' },
       { name: '身份证阅读器-A02', typeId: dt7.id, status: 'active', stationId: stationA.id, counterId: counterA02.id, position: 5, serialNumber: 'ID2024002', customData: '{}' },
-      { name: '身份证阅读器-备机01', typeId: dt7.id, status: 'standby', stationId: stationStore.id, position: 14, serialNumber: 'ID2024003', customData: '{}' },
+      { name: '身份证阅读器-备机01', typeId: dt7.id, status: 'standby', stationId: null, position: 14, serialNumber: 'ID2024003', customData: '{}' },
 
       { name: '护照阅读器-B01', typeId: dt8.id, status: 'active', stationId: stationB.id, counterId: counterB01.id, position: 5, serialNumber: 'PP2024001', customData: '{}' },
       { name: '护照阅读器-B02', typeId: dt8.id, status: 'active', stationId: stationB.id, counterId: counterB02.id, position: 5, serialNumber: 'PP2024002', customData: '{}' },
-      { name: '护照阅读器-备机01', typeId: dt8.id, status: 'standby', stationId: stationStore.id, position: 15, serialNumber: 'PP2024003', customData: '{}' },
+      { name: '护照阅读器-备机01', typeId: dt8.id, status: 'standby', stationId: null, position: 15, serialNumber: 'PP2024003', customData: '{}' },
     ],
   })
   console.log('创建48台设备')
@@ -249,9 +246,9 @@ async function main() {
 
   await prisma.deviceChangeRecord.createMany({
     data: [
-      { deviceId: cuss001.id, operatorId: admin.id, operatorName: admin.name, fromStatus: 'standby', toStatus: 'active', fromStationId: stationStore.id, toStationId: stationC.id, reason: 'C区早高峰设备调配' },
-      { deviceId: pc001.id, operatorId: admin.id, operatorName: admin.name, fromStatus: 'standby', toStatus: 'active', fromStationId: stationStore.id, toStationId: stationA.id, toCounterId: counterA01.id, reason: 'A01柜台正式启用' },
-      { deviceId: pc002.id, operatorId: admin.id, operatorName: admin.name, fromStatus: 'standby', toStatus: 'active', fromStationId: stationStore.id, toStationId: stationA.id, toCounterId: counterA02.id, reason: 'A02柜台正式启用' },
+      { deviceId: cuss001.id, operatorId: admin.id, operatorName: admin.name, fromStatus: 'standby', toStatus: 'active', fromStationId: null, toStationId: stationC.id, reason: 'C区早高峰设备调配' },
+      { deviceId: pc001.id, operatorId: admin.id, operatorName: admin.name, fromStatus: 'standby', toStatus: 'active', fromStationId: null, toStationId: stationA.id, toCounterId: counterA01.id, reason: 'A01柜台正式启用' },
+      { deviceId: pc002.id, operatorId: admin.id, operatorName: admin.name, fromStatus: 'standby', toStatus: 'active', fromStationId: null, toStationId: stationA.id, toCounterId: counterA02.id, reason: 'A02柜台正式启用' },
     ],
   })
   console.log('创建3条设备变更记录')
@@ -261,7 +258,7 @@ async function main() {
   console.log('  数据库初始化完成！')
   console.log('========================================')
   console.log('')
-  console.log('  站点: 8 个')
+  console.log('  站点: 7 个')
   console.log('  柜台/登机口: 25 个')
   console.log('  设备类型: 8 种')
   console.log('  设备总数: 48 台')
