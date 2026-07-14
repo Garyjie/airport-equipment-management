@@ -1,5 +1,0 @@
-﻿◇ injected env (0) from .env // tip: ◈ encrypted .env [www.dotenvx.com]
-◇ injected env (0) from .env // tip: ◈ secrets for agents [www.dotenvx.com]
-数据库连接成功
-服务器运行在 http://localhost:5000
-局域网访问: http://<你的IP>:5000
