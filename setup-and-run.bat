@@ -1,9 +1,10 @@
 @echo off
-chcp 65001 >nul
-title 机场设备管理系统 - 一键部署
+setlocal EnableExtensions DisableDelayedExpansion
+title Airport Equipment Management - One-Click Deploy
 
 echo ============================================
-echo   机场设备管理系统 - 一键部署脚本
+echo   Airport Equipment Management System
+echo   One-Click Deployment Script
 echo ============================================
 echo.
 
@@ -13,55 +14,64 @@ set "NODE_INSTALLER=%TEMP%\node-v%NODE_VERSION%-x64.msi"
 
 set "PROJECT_DIR=%~dp0"
 cd /d "%PROJECT_DIR%"
+if errorlevel 1 goto :FATAL_CD
 
 :CHECK_NODE
-echo [1/4] 检测 Node.js 环境...
+echo [1/4] Checking Node.js environment...
 where node >nul 2>&1
-if %errorlevel% equ 0 (
-    for /f "tokens=2" %%i in ('node --version') do set "NODE_VER=%%i"
-    echo       ✅ Node.js 已安装: v%NODE_VER%
-    
-    where npm >nul 2>&1
-    if %errorlevel% equ 0 (
-        for /f "tokens=3" %%i in ('npm --version') do set "NPM_VER=%%i"
-        echo       ✅ npm 已安装: v%NPM_VER%
-    ) else (
-        echo       ❌ npm 未找到，尝试修复...
-        call :FIX_NPM
-    )
-) else (
-    echo       ❌ Node.js 未安装
-    echo       正在下载 Node.js v%NODE_VERSION%...
-    call :INSTALL_NODE
-)
+if not errorlevel 1 goto :NODE_OK
+goto :NODE_MISSING
 
+:NODE_OK
+for /f "tokens=*" %%i in ('node --version 2^>nul') do set "NODE_VER=%%i"
+echo       [OK] Node.js installed: %NODE_VER%
+
+where npm >nul 2>&1
+if not errorlevel 1 goto :NPM_OK
+goto :NPM_MISSING
+
+:NPM_OK
+for /f "tokens=*" %%i in ('npm --version 2^>nul') do set "NPM_VER=%%i"
+echo       [OK] npm installed: %NPM_VER%
+goto :NODE_DONE
+
+:NPM_MISSING
+echo       [FAIL] npm not found, trying to fix...
+call :FIX_NPM
+goto :NODE_DONE
+
+:NODE_MISSING
+echo       [FAIL] Node.js not installed
+echo       Downloading Node.js v%NODE_VERSION%...
+call :INSTALL_NODE
+goto :NODE_DONE
+
+:NODE_DONE
 echo.
 goto CHECK_DEPENDENCIES
 
 :INSTALL_NODE
 powershell -Command "Invoke-WebRequest -Uri '%NODE_URL%' -OutFile '%NODE_INSTALLER%'"
-if %errorlevel% neq 0 (
-    echo       ❌ 下载失败，请手动安装 Node.js
-    echo       下载地址: %NODE_URL%
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo       [FAIL] Download failed, please install Node.js manually
+    echo       Download URL: %NODE_URL%
+    goto :PAUSE_EXIT
 )
-echo       ✅ 下载完成，正在安装...
+echo       [OK] Download finished, installing...
 msiexec /i "%NODE_INSTALLER%" /qn /norestart
-if %errorlevel% neq 0 (
-    echo       ❌ 安装失败，请手动安装 Node.js
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo       [FAIL] Install failed, please install Node.js manually
+    goto :PAUSE_EXIT
 )
-echo       ✅ Node.js 安装完成
-del "%NODE_INSTALLER%"
+echo       [OK] Node.js installed successfully
+if exist "%NODE_INSTALLER%" del "%NODE_INSTALLER%" >nul 2>&1
 
-echo       正在刷新系统 PATH...
+echo       Refreshing system PATH...
 set "NODE_PATH=C:\Program Files\nodejs"
 set "PATH=%NODE_PATH%;%PATH%"
 where node >nul 2>&1
-if %errorlevel% neq 0 (
-    echo       ⚠️  PATH 未立即生效，尝试使用绝对路径...
+if errorlevel 1 (
+    echo       [WARN] PATH not effective immediately, trying absolute path...
     set "NODE_EXE=%NODE_PATH%\node.exe"
     set "NPM_CMD=%NODE_PATH%\npm.cmd"
 )
@@ -75,21 +85,19 @@ if not exist "%NPM_DIR%" (
 )
 set "PATH=%NPM_DIR%;%PATH%"
 where npm >nul 2>&1
-if %errorlevel% equ 0 (
-    echo       ✅ npm 修复成功
-) else (
-    echo       ❌ npm 修复失败，请重新安装 Node.js
-    pause
-    exit /b 1
+if not errorlevel 1 (
+    echo       [OK] npm fix succeeded
+    goto :EOF
 )
-goto :EOF
+echo       [FAIL] npm fix failed, please reinstall Node.js
+goto :PAUSE_EXIT
 
 :CHECK_DEPENDENCIES
-echo [2/4] 检测项目依赖...
+echo [2/4] Checking project dependencies...
 if exist "node_modules" (
-    echo       ✅ 依赖已安装
+    echo       [OK] Dependencies already installed
 ) else (
-    echo       ❌ 依赖未安装，正在安装...
+    echo       [FAIL] Dependencies missing, installing...
     call :INSTALL_DEPENDENCIES
 )
 
@@ -102,21 +110,20 @@ if defined NPM_CMD (
 ) else (
     npm install
 )
-if %errorlevel% neq 0 (
-    echo       ❌ 依赖安装失败
-    echo       错误信息: %errorlevel%
-    pause
-    exit /b 1
+if errorlevel 1 (
+    echo       [FAIL] Dependency installation failed
+    echo       Error code: %errorlevel%
+    goto :PAUSE_EXIT
 )
-echo       ✅ 依赖安装完成
+echo       [OK] Dependencies installed successfully
 goto :EOF
 
 :CHECK_DATABASE
-echo [3/4] 检测数据库...
+echo [3/4] Checking database...
 if exist "prisma\dev.db" (
-    echo       ✅ 数据库文件存在
+    echo       [OK] Database file exists
 ) else (
-    echo       ❌ 数据库文件不存在，正在初始化...
+    echo       [FAIL] Database missing, initializing...
     call :INIT_DATABASE
 )
 
@@ -126,33 +133,51 @@ goto START_APP
 :INIT_DATABASE
 if defined NPM_CMD (
     "%NPM_CMD%" run prisma:migrate
+    if errorlevel 1 goto :DB_FAIL
     "%NPM_CMD%" run prisma:seed
+    if errorlevel 1 goto :DB_FAIL
 ) else (
     npm run prisma:migrate
+    if errorlevel 1 goto :DB_FAIL
     npm run prisma:seed
+    if errorlevel 1 goto :DB_FAIL
 )
-if %errorlevel% neq 0 (
-    echo       ❌ 数据库初始化失败
-    pause
-    exit /b 1
-)
-echo       ✅ 数据库初始化完成
+echo       [OK] Database initialized successfully
 goto :EOF
 
+:DB_FAIL
+echo       [FAIL] Database initialization failed
+goto :PAUSE_EXIT
+
 :START_APP
-echo [4/4] 启动应用...
-echo       后端服务: http://localhost:5000
-echo       前端页面: http://localhost:3000
+echo [4/4] Starting application...
+echo       Backend API: http://localhost:5000
+echo       Frontend URL: http://localhost:3000
 echo.
-echo       按 Ctrl+C 停止服务
+echo       Press Ctrl+C to stop services
 echo ============================================
 echo.
 
-start "后端服务" cmd /k "npm run server:dev"
+start "Backend Server" cmd /k "cd /d ""%PROJECT_DIR%"" && npm run server:dev"
 timeout /t 3 /nobreak >nul
-start "前端页面" cmd /k "npm run dev"
+start "Frontend Server" cmd /k "cd /d ""%PROJECT_DIR%"" && npm run dev"
 
 start http://localhost:3000
-echo       ✅ 应用已启动！
+echo       [OK] Application started!
+echo.
+goto :END_PAUSE
+
+:FATAL_CD
+echo [FATAL] Cannot switch to project directory: %PROJECT_DIR%
+goto :PAUSE_EXIT
+
+:PAUSE_EXIT
 echo.
 pause
+exit /b 1
+
+:END_PAUSE
+echo.
+pause
+endlocal
+exit /b 0
