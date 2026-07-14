@@ -15,6 +15,10 @@ echo [1/3] Cleaning old processes...
 taskkill /F /IM node.exe /T >nul 2>&1
 timeout /t 2 /nobreak >nul
 
+echo [1.5/3] Generating Prisma Client...
+call npx prisma generate
+if errorlevel 1 goto :FAIL_PRISMA
+
 echo [2/3] Starting backend server (port 5000)...
 start "Backend Server" cmd /k "cd /d ""%PROJECT_DIR%"" && npm run server"
 
@@ -40,6 +44,14 @@ start "" "http://localhost:3000"
 
 endlocal
 goto :EOF
+
+:FAIL_PRISMA
+echo.
+echo [FAIL] Failed to generate Prisma Client!
+echo Please run "npx prisma generate" manually and try again.
+echo.
+pause
+exit /b 1
 
 :FATAL_CD
 echo.

@@ -127,6 +127,16 @@ if exist "prisma\dev.db" (
     call :INIT_DATABASE
 )
 
+echo [3.5/4] Ensuring Prisma Client generated...
+if defined NPM_CMD (
+    "%NPM_CMD%" run prisma:generate
+    if errorlevel 1 goto :PRISMA_GEN_FAIL
+) else (
+    npm run prisma:generate
+    if errorlevel 1 goto :PRISMA_GEN_FAIL
+)
+echo       [OK] Prisma Client ready
+
 echo.
 goto START_APP
 
@@ -149,6 +159,11 @@ goto :EOF
 echo       [FAIL] Database initialization failed
 goto :PAUSE_EXIT
 
+:PRISMA_GEN_FAIL
+echo       [FAIL] Prisma Client generation failed
+echo       Tip: Try running "npm run prisma:generate" manually
+goto :PAUSE_EXIT
+
 :START_APP
 echo [4/4] Starting application...
 echo       Backend API: http://localhost:5000
@@ -162,7 +177,7 @@ start "Backend Server" cmd /k "cd /d ""%PROJECT_DIR%"" && npm run server:dev"
 timeout /t 3 /nobreak >nul
 start "Frontend Server" cmd /k "cd /d ""%PROJECT_DIR%"" && npm run dev"
 
-start http://localhost:3000
+start "" "http://localhost:3000"
 echo       [OK] Application started!
 echo.
 goto :END_PAUSE
