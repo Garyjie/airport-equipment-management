@@ -324,14 +324,13 @@ export default function DeviceTypesPage() {
 
   const handleDelete = (id: string) => {
     const typeDevices = devices.filter(d => d.typeId === id)
-    if (typeDevices.length > 0) {
-      toast.error('该类型下还有设备，无法删除')
-      return
-    }
+    const hasDevices = typeDevices.length > 0
     setConfirmDialog({
       open: true,
       title: '确认删除设备类型',
-      description: '确定要删除这个设备类型吗？此操作无法撤销。',
+      description: hasDevices
+        ? `该类型下有 ${typeDevices.length} 台设备，删除类型将同时删除这些设备。此操作无法撤销。`
+        : '确定要删除这个设备类型吗？此操作无法撤销。',
       onConfirm: async () => {
         try {
           await deleteDeviceType(id)

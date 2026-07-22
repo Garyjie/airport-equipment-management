@@ -8,8 +8,8 @@ echo   One-Click Deployment Script
 echo ============================================
 echo.
 
-set "NODE_VERSION=20.17.0"
-set "NODE_URL=https://nodejs.org/dist/v%NODE_VERSION%/node-v%NODE_VERSION%-x64.msi"
+set "NODE_VERSION=20.11.0"
+set "NODE_URL=https://mirrors.huaweicloud.com/nodejs/v%NODE_VERSION%/node-v%NODE_VERSION%-x64.msi"
 set "NODE_INSTALLER=%TEMP%\node-v%NODE_VERSION%-x64.msi"
 
 set "PROJECT_DIR=%~dp0"
@@ -48,23 +48,64 @@ goto :NODE_DONE
 
 :NODE_DONE
 echo.
+echo [1.5/4] Configuring npm mirror sources...
+set "MIRROR1=https://registry.npmmirror.com"
+set "MIRROR2=https://mirrors.huaweicloud.com/repository/npm/"
+set "MIRROR3=https://mirrors.cloud.tencent.com/npm/"
+
+set "NPM_CMD_TO_USE=npm"
+if defined NPM_CMD set "NPM_CMD_TO_USE=%NPM_CMD%"
+
+call :TRY_MIRROR "%MIRROR1%" "Taobao"
+if not errorlevel 1 goto MIRROR_OK
+call :TRY_MIRROR "%MIRROR2%" "Huawei"
+if not errorlevel 1 goto MIRROR_OK
+call :TRY_MIRROR "%MIRROR3%" "Tencent"
+if not errorlevel 1 goto MIRROR_OK
+
+echo       [WARN] All mirror sources failed, resetting to official npm registry
+"%NPM_CMD_TO_USE%" config set registry https://registry.npmjs.org >nul 2>&1
+goto MIRROR_OK
+
+:TRY_MIRROR
+echo       Trying %2 mirror...
+"%NPM_CMD_TO_USE%" config set registry %1 >nul 2>&1
+if errorlevel 1 exit /b 1
+"%NPM_CMD_TO_USE%" info npm version >nul 2>&1
+if not errorlevel 1 (
+    echo       [OK] Using %2 mirror: %1
+    exit /b 0
+)
+exit /b 1
+
+:MIRROR_OK
+echo.
 goto CHECK_DEPENDENCIES
 
 :INSTALL_NODE
-powershell -Command "Invoke-WebRequest -Uri '%NODE_URL%' -OutFile '%NODE_INSTALLER%'"
-if errorlevel 1 (
-    echo       [FAIL] Download failed, please install Node.js manually
-    echo       Download URL: %NODE_URL%
-    goto :PAUSE_EXIT
+set "LOCAL_INSTALLER=%PROJECT_DIR%node-v%NODE_VERSION%-x64.msi"
+
+if exist "%LOCAL_INSTALLER%" (
+    echo       [OK] Found local installer, installing directly...
+    msiexec /i "%LOCAL_INSTALLER%" /qn /norestart
+) else (
+    echo       [WARN] Local installer not found, downloading from mirror...
+    powershell -Command "Invoke-WebRequest -Uri '%NODE_URL%' -OutFile '%NODE_INSTALLER%'"
+    if errorlevel 1 (
+        echo       [FAIL] Download failed, please install Node.js manually
+        echo       Download URL: %NODE_URL%
+        goto :PAUSE_EXIT
+    )
+    echo       [OK] Download finished, installing...
+    msiexec /i "%NODE_INSTALLER%" /qn /norestart
+    if exist "%NODE_INSTALLER%" del "%NODE_INSTALLER%" >nul 2>&1
 )
-echo       [OK] Download finished, installing...
-msiexec /i "%NODE_INSTALLER%" /qn /norestart
+
 if errorlevel 1 (
     echo       [FAIL] Install failed, please install Node.js manually
     goto :PAUSE_EXIT
 )
 echo       [OK] Node.js installed successfully
-if exist "%NODE_INSTALLER%" del "%NODE_INSTALLER%" >nul 2>&1
 
 echo       Refreshing system PATH...
 set "NODE_PATH=C:\Program Files\nodejs"
@@ -192,6 +233,12 @@ pause
 exit /b 1
 
 :END_PAUSE
+echo.
+echo ============================================
+echo   创作者：原靖杰
+echo   时间：2026.7.22
+echo   版本：v1.0
+echo ============================================
 echo.
 pause
 endlocal

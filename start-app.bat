@@ -42,6 +42,14 @@ pause >nul
 
 start "" "http://localhost:3000"
 
+echo.
+echo ==========================================
+echo   创作者：原靖杰
+echo   时间：2026.7.22
+echo   版本：v1.0
+echo ==========================================
+echo.
+
 endlocal
 goto :EOF
 

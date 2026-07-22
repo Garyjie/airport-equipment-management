@@ -132,15 +132,14 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ error: '设备类型不存在' })
     }
 
-    const deviceCount = await prisma.device.count({ where: { typeId: req.params.id } })
+    const devices = await prisma.device.findMany({ where: { typeId: req.params.id } })
 
-    if (deviceCount > 0) {
-      return res.status(400).json({ error: '该类型下有设备，无法删除' })
+    if (devices.length > 0) {
+      await prisma.device.deleteMany({ where: { typeId: req.params.id } })
     }
 
-    await prisma.deviceType.update({
+    await prisma.deviceType.delete({
       where: { id: req.params.id },
-      data: { isActive: false },
     })
 
     await prisma.auditLog.create({
@@ -149,10 +148,11 @@ router.delete('/:id', authenticateToken, async (req, res) => {
         action: 'delete',
         resourceType: 'deviceType',
         resourceId: req.params.id,
+        details: JSON.stringify({ deletedDeviceCount: devices.length, deviceTypeName: deviceType.name }),
       },
     })
 
-    res.json({ message: '设备类型已删除' })
+    res.json({ message: '设备类型已删除', deletedDeviceCount: devices.length })
   } catch (error) {
     res.status(500).json({ error: '删除设备类型失败' })
   }

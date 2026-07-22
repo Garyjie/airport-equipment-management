@@ -8,6 +8,14 @@ if errorlevel 1 goto :FATAL_CD
 
 node migrate-db.js
 
+echo.
+echo ==========================================
+echo   创作者：原靖杰
+echo   时间：2026.7.22
+echo   版本：v1.0
+echo ==========================================
+echo.
+
 pause
 endlocal
 goto :EOF
